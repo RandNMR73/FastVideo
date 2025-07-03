@@ -233,7 +233,7 @@ class FlowMatchDiscreteScheduler(SchedulerMixin, ConfigMixin, BaseScheduler):
                 returned, otherwise a tuple is returned where the first element is the sample tensor.
         """
 
-        if isinstance(timestep, (int, torch.IntTensor, torch.LongTensor)):
+        if isinstance(timestep, (int | torch.IntTensor | torch.LongTensor)):
             raise ValueError((
                 "Passing integer indices (e.g. from `enumerate(timesteps)`) as timesteps to"
                 " `EulerDiscreteScheduler.step()` is not supported. Make sure to pass"
