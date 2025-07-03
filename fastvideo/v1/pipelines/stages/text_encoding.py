@@ -6,16 +6,17 @@ This module contains implementations of prompt encoding stages for diffusion pip
 """
 
 import gc
+
 import torch
 
 from fastvideo.v1.distributed import get_local_torch_device
 from fastvideo.v1.fastvideo_args import FastVideoArgs
 from fastvideo.v1.forward_context import set_forward_context
+from fastvideo.v1.logger import init_logger
 from fastvideo.v1.pipelines.pipeline_batch_info import ForwardBatch
 from fastvideo.v1.pipelines.stages.base import PipelineStage
 from fastvideo.v1.pipelines.stages.validators import StageValidators as V
 from fastvideo.v1.pipelines.stages.validators import VerificationResult
-from fastvideo.v1.logger import init_logger
 
 logger = init_logger(__name__)
 
@@ -63,7 +64,7 @@ class TextEncodingStage(PipelineStage):
                 self.tokenizers, self.text_encoders,
                 fastvideo_args.pipeline_config.text_encoder_configs,
                 fastvideo_args.pipeline_config.preprocess_text_funcs,
-                fastvideo_args.pipeline_config.postprocess_text_funcs):
+                fastvideo_args.pipeline_config.postprocess_text_funcs, strict=False):
 
             assert isinstance(batch.prompt, str | list)
             if isinstance(batch.prompt, str):
@@ -113,11 +114,11 @@ class TextEncodingStage(PipelineStage):
 
             if fastvideo_args.text_encoder_offload:
                 text_encoder.to('cpu')
-            
+
             # deallocate text encoder and tokenizer if on mps
             if torch.backends.mps.is_available():
                 del text_encoder
-                del tokenizer    
+                del tokenizer
                 gc.collect()
                 torch.mps.empty_cache()
 

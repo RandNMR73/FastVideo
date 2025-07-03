@@ -7,7 +7,7 @@ import os
 import signal
 import sys
 from multiprocessing.connection import Connection
-from typing import Any, Dict, TextIO, cast
+from typing import Any, TextIO, cast
 
 import psutil
 import torch
@@ -65,7 +65,7 @@ class Worker:
 
         # This env var set by Ray causes exceptions with graph building.
         os.environ.pop("NCCL_ASYNC_ERROR_HANDLING", None)
-        
+
         # Platform-agnostic device initialization
         if torch.cuda.is_available():
             self.device = torch.device(f"cuda:{self.local_rank}")
@@ -104,7 +104,7 @@ class Worker:
     def set_lora_adapter(self, lora_nickname: str, lora_path: str) -> None:
         self.pipeline.set_lora_adapter(lora_nickname, lora_path)
 
-    def shutdown(self) -> Dict[str, Any]:
+    def shutdown(self) -> dict[str, Any]:
         """Gracefully shut down the worker process"""
         logger.info("Worker %d shutting down...",
                     self.rank,

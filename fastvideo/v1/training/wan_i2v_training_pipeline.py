@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 import sys
 from copy import deepcopy
-from typing import Any, Dict
+from typing import Any
 
 import torch
 
@@ -158,7 +158,7 @@ class WanI2VTrainingPipeline(TrainingPipeline):
 
     def _prepare_validation_inputs(
             self, sampling_param: SamplingParam, training_args: TrainingArgs,
-            validation_batch: Dict[str, Any], num_inference_steps: int,
+            validation_batch: dict[str, Any], num_inference_steps: int,
             negative_prompt_embeds: torch.Tensor | None,
             negative_prompt_attention_mask: torch.Tensor | None
     ) -> ForwardBatch:

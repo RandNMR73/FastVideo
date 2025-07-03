@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
 
 from fastvideo.v1.configs.models.encoders.base import (ImageEncoderArchConfig,
                                                        ImageEncoderConfig,
@@ -35,7 +34,7 @@ class CLIPTextArchConfig(TextEncoderArchConfig):
     bos_token_id: int = 49406
     eos_token_id: int = 49407
     text_len: int = 77
-    stacked_params_mapping: List[Tuple[str, str,
+    stacked_params_mapping: list[tuple[str, str,
                                        str]] = field(default_factory=lambda: [
                                            # (param_name, shard_name, shard_id)
                                            ("qkv_proj", "q_proj", "q"),
@@ -69,8 +68,8 @@ class CLIPTextConfig(TextEncoderConfig):
     arch_config: TextEncoderArchConfig = field(
         default_factory=CLIPTextArchConfig)
 
-    num_hidden_layers_override: Optional[int] = None
-    require_post_norm: Optional[bool] = None
+    num_hidden_layers_override: int | None = None
+    require_post_norm: bool | None = None
     prefix: str = "clip"
 
 
@@ -79,6 +78,6 @@ class CLIPVisionConfig(ImageEncoderConfig):
     arch_config: ImageEncoderArchConfig = field(
         default_factory=CLIPVisionArchConfig)
 
-    num_hidden_layers_override: Optional[int] = None
-    require_post_norm: Optional[bool] = None
+    num_hidden_layers_override: int | None = None
+    require_post_norm: bool | None = None
     prefix: str = "clip"

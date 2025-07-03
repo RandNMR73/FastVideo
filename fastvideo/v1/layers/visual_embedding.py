@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import math
-from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -133,7 +132,7 @@ class ModulateProjection(nn.Module):
         hidden_size: int,
         factor: int = 2,
         act_layer: str = "silu",
-        dtype: Optional[torch.dtype] = None,
+        dtype: torch.dtype | None = None,
         prefix: str = "",
     ):
         super().__init__()

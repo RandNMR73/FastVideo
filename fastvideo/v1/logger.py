@@ -11,7 +11,7 @@ from logging import Logger
 from logging.config import dictConfig
 from os import path
 from types import MethodType
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import fastvideo.v1.envs as envs
 
@@ -279,7 +279,7 @@ def _trace_calls(log_path, root_dir, frame, event, arg=None):
 
 
 def enable_trace_function_call(log_file_path: str,
-                               root_dir: Optional[str] = None):
+                               root_dir: str | None = None):
     """
     Enable tracing of every function call in code under `root_dir`.
     This is useful for debugging hangs or crashes.

@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Code adapted from SGLang https://github.com/sgl-project/sglang/blob/main/python/sglang/srt/lora/layers.py
 
-from typing import Dict, List, Tuple, Type, Union
 
 import torch
 from torch import nn
@@ -66,7 +65,7 @@ class BaseLayerWithLoRA(nn.Module):
             )
 
         assert self.lora_A is not None and self.lora_B is not None, "LoRA weights not set. Please set them first."
-        
+
         # Platform-aware device detection
         if current_platform.is_cuda_alike():
             compute_device = f"cuda:{torch.cuda.current_device()}"
@@ -74,7 +73,7 @@ class BaseLayerWithLoRA(nn.Module):
             compute_device = "mps"
         else:
             compute_device = "cpu"
-        
+
         if isinstance(self.base_layer.weight, DTensor):
             mesh = self.base_layer.weight.data.device_mesh
             placements = self.base_layer.weight.data.placements
@@ -217,7 +216,7 @@ class QKVParallelLinearWithLoRA(ColumnParallelLinearWithLoRA):
         return A
 
     def slice_lora_b_weights(
-            self, B: List[torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+            self, B: list[torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         tp_rank = get_tp_rank()
         B_q, B_kv = B
         base_layer = self.base_layer
@@ -285,8 +284,8 @@ class RowParallelLinearWithLoRA(BaseLayerWithLoRA):
         return B
 
 
-def get_lora_layer(layer: nn.Module) -> Union[BaseLayerWithLoRA, None]:
-    supported_layer_types: Dict[Type[LinearBase], Type[BaseLayerWithLoRA]] = {
+def get_lora_layer(layer: nn.Module) -> BaseLayerWithLoRA | None:
+    supported_layer_types: dict[type[LinearBase], type[BaseLayerWithLoRA]] = {
         # the order matters
         # VocabParallelEmbedding: VocabParallelEmbeddingWithLoRA,
         QKVParallelLinear: QKVParallelLinearWithLoRA,

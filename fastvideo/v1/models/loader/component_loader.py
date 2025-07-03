@@ -6,11 +6,11 @@ import json
 import os
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Generator, Iterable
 from copy import deepcopy
-from typing import Any, Generator, Iterable, List, Optional, Tuple, cast
+from typing import Any, cast
 
 import torch
-import torch.distributed as dist
 import torch.nn as nn
 from safetensors.torch import load_file as safetensors_load_file
 from transformers import AutoImageProcessor, AutoTokenizer
@@ -21,9 +21,7 @@ from fastvideo.v1.distributed import get_local_torch_device
 from fastvideo.v1.fastvideo_args import FastVideoArgs
 from fastvideo.v1.logger import init_logger
 from fastvideo.v1.models.hf_transformer_utils import get_diffusers_config
-from fastvideo.v1.models.loader.fsdp_load import (init_device_mesh,
-                                                  maybe_load_fsdp_model,
-                                                  shard_model)
+from fastvideo.v1.models.loader.fsdp_load import maybe_load_fsdp_model
 from fastvideo.v1.models.loader.utils import set_default_torch_dtype
 from fastvideo.v1.models.loader.weight_utils import (
     filter_duplicate_safetensors_files, filter_files_not_needed_for_inference,
@@ -111,7 +109,7 @@ class TextEncoderLoader(ComponentLoader):
         fall_back_to_pt: bool = True
         """Whether .pt weights can be used."""
 
-        allow_patterns_overrides: Optional[list[str]] = None
+        allow_patterns_overrides: list[str] | None = None
         """If defined, weights will load exclusively using these patterns."""
 
     counter_before_loading_weights: float = 0.0
@@ -121,8 +119,8 @@ class TextEncoderLoader(ComponentLoader):
         self,
         model_name_or_path: str,
         fall_back_to_pt: bool,
-        allow_patterns_overrides: Optional[list[str]],
-    ) -> Tuple[str, List[str], bool]:
+        allow_patterns_overrides: list[str] | None,
+    ) -> tuple[str, list[str], bool]:
         """Prepare weights for the model.
 
         If the model is not local, it will be downloaded."""
@@ -144,7 +142,7 @@ class TextEncoderLoader(ComponentLoader):
 
         hf_folder = model_name_or_path
 
-        hf_weights_files: List[str] = []
+        hf_weights_files: list[str] = []
         for pattern in allow_patterns:
             hf_weights_files += glob.glob(os.path.join(hf_folder, pattern))
             if len(hf_weights_files) > 0:
@@ -169,7 +167,7 @@ class TextEncoderLoader(ComponentLoader):
             self,
             source: "Source",
             to_cpu: bool = True
-    ) -> Generator[Tuple[str, torch.Tensor], None, None]:
+    ) -> Generator[tuple[str, torch.Tensor], None, None]:
         """Get an iterator for the model weights based on the load format."""
         hf_folder, hf_weights_files, use_safetensors = self._prepare_weights(
             source.model_or_path, source.fall_back_to_pt,
@@ -192,7 +190,7 @@ class TextEncoderLoader(ComponentLoader):
             model: nn.Module,
             model_path: str,
             to_cpu: bool = True
-    ) -> Generator[Tuple[str, torch.Tensor], None, None]:
+    ) -> Generator[tuple[str, torch.Tensor], None, None]:
         primary_weights = TextEncoderLoader.Source(
             model_path,
             prefix="",
@@ -300,7 +298,7 @@ class ImageEncoderLoader(TextEncoderLoader):
         target_device = get_local_torch_device()
         # TODO(will): add support for other dtypes
         return self.load_model(
-            model_path, encoder_config, target_device, 
+            model_path, encoder_config, target_device,
             fastvideo_args.pipeline_config.image_encoder_precision)
 
 

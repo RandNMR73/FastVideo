@@ -16,10 +16,10 @@ import sys
 import tempfile
 import threading
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass, fields, is_dataclass
 from functools import lru_cache, partial, wraps
-from typing import (Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar,
-                    Union, cast)
+from typing import Any, TypeVar, cast
 
 import cloudpickle
 import filelock
@@ -79,7 +79,7 @@ prev_set_stream = torch.cuda.set_stream
 _current_stream = None
 
 
-def _patched_set_stream(stream: Optional[torch.cuda.Stream]) -> None:
+def _patched_set_stream(stream: torch.cuda.Stream | None) -> None:
     global _current_stream
     _current_stream = stream
     if stream is not None:
@@ -89,7 +89,7 @@ def _patched_set_stream(stream: Optional[torch.cuda.Stream]) -> None:
 torch.cuda.set_stream = _patched_set_stream
 
 
-def current_stream() -> Optional[torch.cuda.Stream]:
+def current_stream() -> torch.cuda.Stream | None:
     """
     replace `torch.cuda.current_stream()` with `fastvideo.v1.utils.current_stream()`.
     it turns out that `torch.cuda.current_stream()` is quite expensive,
@@ -101,11 +101,11 @@ def current_stream() -> Optional[torch.cuda.Stream]:
     from C/C++ code.
     """
     from fastvideo.v1.platforms import current_platform
-    
+
     # For non-CUDA platforms, return None
     if not current_platform.is_cuda_alike():
         return None
-    
+
     global _current_stream
     if _current_stream is None:
         # when this function is called before any stream is set,
@@ -220,7 +220,7 @@ class FlexibleArgumentParser(argparse.ArgumentParser):
 
         return namespace  # type: ignore[no-any-return]
 
-    def _pull_args_from_config(self, args: List[str]) -> List[str]:
+    def _pull_args_from_config(self, args: list[str]) -> list[str]:
         """Method to pull arguments specified in the config file
         into the command-line args variable.
 
@@ -285,7 +285,7 @@ class FlexibleArgumentParser(argparse.ArgumentParser):
 
         return args
 
-    def _load_config_file(self, file_path: str) -> List[str]:
+    def _load_config_file(self, file_path: str) -> list[str]:
         """Loads a yaml file and returns the key value pairs as a
         flattened list with argparse like pattern
         ```yaml
@@ -310,9 +310,9 @@ class FlexibleArgumentParser(argparse.ArgumentParser):
                 "Config file must be of a yaml/yml/json type.\
                               %s supplied", extension)
 
-        processed_args: List[str] = []
+        processed_args: list[str] = []
 
-        config: Dict[str, Any] = {}
+        config: dict[str, Any] = {}
         try:
             with open(file_path) as config_file:
                 config = yaml.safe_load(config_file)
@@ -327,7 +327,7 @@ class FlexibleArgumentParser(argparse.ArgumentParser):
             if isinstance(action, StoreBoolean)
         ]
 
-        def process_dict(prefix: str, d: Dict[str, Any]):
+        def process_dict(prefix: str, d: dict[str, Any]):
             for key, value in d.items():
                 full_key = f"{prefix}.{key}" if prefix else key
 
@@ -365,7 +365,7 @@ def get_lock(model_name_or_path: str):
     return lock
 
 
-def warn_for_unimplemented_methods(cls: Type[T]) -> Type[T]:
+def warn_for_unimplemented_methods(cls: type[T]) -> type[T]:
     """
     A replacement for `abc.ABC`.
     When we use `abc.ABC`, subclasses will fail to instantiate
@@ -461,7 +461,7 @@ def import_pynvml():
 
 
 def maybe_download_model(model_name_or_path: str,
-                         local_dir: Optional[str] = None,
+                         local_dir: str | None = None,
                          download: bool = True) -> str:
     """
     Check if the model path is a Hugging Face Hub model ID and download it if needed.
@@ -498,7 +498,7 @@ def maybe_download_model(model_name_or_path: str,
 
 
 def maybe_download_lora(model_name_or_path: str,
-                        local_dir: Optional[str] = None,
+                        local_dir: str | None = None,
                         download: bool = True) -> str:
     """
     Check if the model path is a Hugging Face Hub model ID and download it if needed.
@@ -517,7 +517,7 @@ def maybe_download_lora(model_name_or_path: str,
     return os.path.join(local_path, weight_name)
 
 
-def verify_model_config_and_directory(model_path: str) -> Dict[str, Any]:
+def verify_model_config_and_directory(model_path: str) -> dict[str, Any]:
     """
     Verify that the model directory contains a valid diffusers configuration.
     
@@ -557,10 +557,10 @@ def verify_model_config_and_directory(model_path: str) -> Dict[str, Any]:
         raise ValueError("model_index.json does not contain _diffusers_version")
 
     logger.info("Diffusers version: %s", config["_diffusers_version"])
-    return cast(Dict[str, Any], config)
+    return cast(dict[str, Any], config)
 
 
-def maybe_download_model_index(model_name_or_path: str) -> Dict[str, Any]:
+def maybe_download_model_index(model_name_or_path: str) -> dict[str, Any]:
     """
     Download and extract just the model_index.json for a Hugging Face model.
     
@@ -588,7 +588,7 @@ def maybe_download_model_index(model_name_or_path: str) -> Dict[str, Any]:
 
             # Load the model_index.json
             with open(model_index_path) as f:
-                config: Dict[str, Any] = json.load(f)
+                config: dict[str, Any] = json.load(f)
 
             # Verify it has the required fields
             if "_class_name" not in config:
@@ -614,7 +614,7 @@ def maybe_download_model_index(model_name_or_path: str) -> Dict[str, Any]:
         ) from e
 
 
-def update_environment_variables(envs: Dict[str, str]):
+def update_environment_variables(envs: dict[str, str]):
     for k, v in envs.items():
         if k in os.environ and os.environ[k] != v:
             logger.warning(
@@ -623,7 +623,7 @@ def update_environment_variables(envs: Dict[str, str]):
         os.environ[k] = v
 
 
-def run_method(obj: Any, method: Union[str, bytes, Callable], args: tuple[Any],
+def run_method(obj: Any, method: str | bytes | Callable, args: tuple[Any],
                kwargs: dict[str, Any]) -> Any:
     """
     Run a method of an object with the given arguments and keyword arguments.
@@ -645,17 +645,18 @@ def run_method(obj: Any, method: Union[str, bytes, Callable], args: tuple[Any],
     return func(*args, **kwargs)
 
 
-def shallow_asdict(obj) -> Dict[str, Any]:
+def shallow_asdict(obj) -> dict[str, Any]:
     if not is_dataclass(obj):
         raise TypeError("Expected dataclass instance")
     return {f.name: getattr(obj, f.name) for f in fields(obj)}
+
 
 # TODO: validate that this is fine
 def kill_itself_when_parent_died() -> None:
     # if sys.platform == "linux":
     # sigkill this process when parent worker manager dies
     PR_SET_PDEATHSIG = 1
-    import platform 
+    import platform
     if platform.system() == "Linux":
         libc = ctypes.CDLL("libc.so.6")
         libc.prctl(PR_SET_PDEATHSIG, signal.SIGKILL)
@@ -663,7 +664,8 @@ def kill_itself_when_parent_died() -> None:
     #     libc = ctypes.CDLL("libc.dylib")
     #     logger.warning("kill_itself_when_parent_died is only supported in linux.")
     else:
-        logger.warning("kill_itself_when_parent_died is only supported in linux.")
+        logger.warning(
+            "kill_itself_when_parent_died is only supported in linux.")
 
 
 def get_exception_traceback() -> str:
@@ -674,7 +676,7 @@ def get_exception_traceback() -> str:
 
 class TypeBasedDispatcher:
 
-    def __init__(self, mapping: List[Tuple[Type, Callable]]):
+    def __init__(self, mapping: list[tuple[type, Callable]]):
         self._mapping = mapping
 
     def __call__(self, obj: Any):
@@ -695,11 +697,11 @@ def remote_breakpoint() -> None:
 
 @dataclass
 class MixedPrecisionState:
-    master_dtype: Optional[torch.dtype] = None
-    param_dtype: Optional[torch.dtype] = None
-    reduce_dtype: Optional[torch.dtype] = None
-    output_dtype: Optional[torch.dtype] = None
-    compute_dtype: Optional[torch.dtype] = None
+    master_dtype: torch.dtype | None = None
+    param_dtype: torch.dtype | None = None
+    reduce_dtype: torch.dtype | None = None
+    output_dtype: torch.dtype | None = None
+    compute_dtype: torch.dtype | None = None
 
 
 # Thread-local storage for mixed precision state
@@ -716,7 +718,7 @@ def get_mixed_precision_state() -> MixedPrecisionState:
 def set_mixed_precision_policy(master_dtype: torch.dtype,
                                param_dtype: torch.dtype,
                                reduce_dtype: torch.dtype,
-                               output_dtype: Optional[torch.dtype] = None):
+                               output_dtype: torch.dtype | None = None):
     """Set mixed precision policy globally.
     
     Args:
@@ -747,11 +749,11 @@ def get_compute_dtype() -> torch.dtype:
 
 
 def dict_to_3d_list(
-    mask_strategy: Optional[Dict[str, Any]] = None,
-    t_max: Optional[int] = None,
-    l_max: Optional[int] = None,
-    h_max: Optional[int] = None,
-) -> List[List[List[Optional[torch.Tensor]]]]:
+    mask_strategy: dict[str, Any] | None = None,
+    t_max: int | None = None,
+    l_max: int | None = None,
+    h_max: int | None = None,
+) -> list[list[list[torch.Tensor | None]]]:
     """
     Convert a dictionary of mask indices to a 3D list of tensors.
     Args:

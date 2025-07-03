@@ -5,7 +5,8 @@ Denoising stage for diffusion pipelines.
 
 import gc
 import inspect
-from typing import Any, Dict, Iterable, Optional
+from collections.abc import Iterable
+from typing import Any
 
 import torch
 from einops import rearrange
@@ -304,18 +305,20 @@ class DenoisingStage(PipelineStage):
         if fastvideo_args.use_cpu_offload:
             self.transformer.to('cpu')
             torch.cuda.empty_cache()
-        
+
         # deallocate transformer if on mps
         if torch.backends.mps.is_available():
-            logger.info("Memory before deallocating transformer: %s", torch.mps.current_allocated_memory())
-            del self.transformer    
+            logger.info("Memory before deallocating transformer: %s",
+                        torch.mps.current_allocated_memory())
+            del self.transformer
             gc.collect()
             torch.mps.empty_cache()
-            logger.info("Memory after deallocating transformer: %s", torch.mps.current_allocated_memory())
+            logger.info("Memory after deallocating transformer: %s",
+                        torch.mps.current_allocated_memory())
 
         return batch
 
-    def prepare_extra_func_kwargs(self, func, kwargs) -> Dict[str, Any]:
+    def prepare_extra_func_kwargs(self, func, kwargs) -> dict[str, Any]:
         """
         Prepare extra kwargs for the scheduler step / denoise step.
         
@@ -334,8 +337,8 @@ class DenoisingStage(PipelineStage):
         return extra_step_kwargs
 
     def progress_bar(self,
-                     iterable: Optional[Iterable] = None,
-                     total: Optional[int] = None) -> tqdm:
+                     iterable: Iterable | None = None,
+                     total: int | None = None) -> tqdm:
         """
         Create a progress bar for the denoising process.
         
