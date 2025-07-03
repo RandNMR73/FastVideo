@@ -2,7 +2,7 @@
 # Adapted from vllm: https://github.com/vllm-project/vllm/blob/v0.7.3/vllm/platforms/__init__.py
 
 import traceback
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from fastvideo.v1.logger import init_logger
 # imported by other files, do not remove
@@ -13,7 +13,7 @@ from fastvideo.v1.utils import resolve_obj_by_qualname
 logger = init_logger(__name__)
 
 
-def cuda_platform_plugin() -> Optional[str]:
+def cuda_platform_plugin() -> str | None:
     is_cuda = False
 
     try:
@@ -47,7 +47,7 @@ def cuda_platform_plugin() -> Optional[str]:
     return "fastvideo.v1.platforms.cuda.CudaPlatform" if is_cuda else None
 
 
-def mps_platform_plugin() -> Optional[str]:
+def mps_platform_plugin() -> str | None:
     """Detect if MPS (Metal Performance Shaders) is available on macOS."""
     is_mps = False
     
@@ -64,7 +64,7 @@ def mps_platform_plugin() -> Optional[str]:
     return "fastvideo.v1.platforms.mps.MpsPlatform" if is_mps else None
 
 
-def cpu_platform_plugin() -> Optional[str]:
+def cpu_platform_plugin() -> str | None:
     """Detect if CPU platform should be used."""
     # CPU is always available as a fallback
     return "fastvideo.v1.platforms.cpu.CpuPlatform"
