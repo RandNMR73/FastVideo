@@ -6,7 +6,8 @@ import importlib
 import pkgutil
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import AbstractSet, Dict, Optional, Tuple, Type, Union
+from typing import Dict, Optional, Tuple, Type, Union
+from collections.abc import Set
 
 from fastvideo.v1.logger import init_logger
 from fastvideo.v1.pipelines.composed_pipeline_base import ComposedPipelineBase
@@ -21,7 +22,7 @@ class _PipelineRegistry:
     pipelines: Dict[str, Optional[Type[ComposedPipelineBase]]] = field(
         default_factory=dict)
 
-    def get_supported_archs(self) -> AbstractSet[str]:
+    def get_supported_archs(self) -> Set[str]:
         return self.pipelines.keys()
 
     def _try_load_pipeline_cls(
