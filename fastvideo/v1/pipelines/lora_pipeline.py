@@ -28,6 +28,7 @@ class LoRAPipeline(ComposedPipelineBase):
     lora_layers: Dict[str, BaseLayerWithLoRA] = {}
     fastvideo_args: FastVideoArgs
     exclude_lora_layers: List[str] = []
+    device: torch.device = torch.device("cpu")
     if torch.cuda.is_available():
         device: torch.device = torch.device(f"cuda:{torch.cuda.current_device()}")
     elif torch.backends.mps.is_available():
