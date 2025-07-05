@@ -190,8 +190,10 @@ class SelfAttention(nn.Module):
 
         outs = []
         idx = 0
-        for (chunk_size, cos_i, sin_i) in zip(self.rope_split, cos_splits,
-                                              sin_splits, strict=False):
+        for (chunk_size, cos_i, sin_i) in zip(self.rope_split,
+                                              cos_splits,
+                                              sin_splits,
+                                              strict=False):
             # slice the corresponding channels
             x_chunk = x[..., idx:idx + chunk_size]  # [B,S,H,chunk_size]
             idx += chunk_size

@@ -683,9 +683,8 @@ class TrainingPipeline(ComposedPipelineBase, ABC):
                         all_captions.extend(recv_captions)
 
                     video_filenames = []
-                    for i, (video,
-                            caption) in enumerate(zip(all_videos,
-                                                      all_captions, strict=False)):
+                    for i, (video, caption) in enumerate(
+                            zip(all_videos, all_captions, strict=False)):
                         os.makedirs(training_args.output_dir, exist_ok=True)
                         filename = os.path.join(
                             training_args.output_dir,

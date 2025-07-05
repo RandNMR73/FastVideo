@@ -121,8 +121,11 @@ def get_parquet_files_and_length(path: str):
             num_rows = pq.ParquetFile(file_path).metadata.num_rows
             lengths.append(num_rows)
         # sort according to file name to ensure all rank has the same order (in case os.walk is not sorted)
-        file_names_sorted, lengths_sorted = zip(
-            *sorted(zip(file_names, lengths, strict=False), key=lambda x: x[0]), strict=False)
+        file_names_sorted, lengths_sorted = zip(*sorted(zip(file_names,
+                                                            lengths,
+                                                            strict=False),
+                                                        key=lambda x: x[0]),
+                                                strict=False)
         assert len(
             file_names_sorted) != 0, "No parquet files found in the dataset"
 
@@ -173,7 +176,7 @@ def read_row_from_parquet_file(parquet_files: list[str], global_row_idx: int,
     row_dict = {k: v[local_index] for k, v in row_group.items()}
     del row_group
 
-    return row_dict
+    return row_dict  # type: ignore[no-any-return]
 
 
 # ────────────────────────────────────────────────────────────────────────────

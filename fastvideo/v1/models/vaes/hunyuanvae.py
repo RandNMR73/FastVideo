@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -348,7 +347,9 @@ class HunyuanVideoMidBlock3D(nn.Module):
             hidden_states = self._gradient_checkpointing_func(
                 self.resnets[0], hidden_states)
 
-            for attn, resnet in zip(self.attentions, self.resnets[1:], strict=False):
+            for attn, resnet in zip(self.attentions,
+                                    self.resnets[1:],
+                                    strict=False):
                 if attn is not None:
                     batch_size, num_channels, num_frames, height, width = hidden_states.shape
                     hidden_states = hidden_states.permute(0, 2, 3, 4,
@@ -370,7 +371,9 @@ class HunyuanVideoMidBlock3D(nn.Module):
         else:
             hidden_states = self.resnets[0](hidden_states)
 
-            for attn, resnet in zip(self.attentions, self.resnets[1:], strict=False):
+            for attn, resnet in zip(self.attentions,
+                                    self.resnets[1:],
+                                    strict=False):
                 if attn is not None:
                     batch_size, num_channels, num_frames, height, width = hidden_states.shape
                     hidden_states = hidden_states.permute(0, 2, 3, 4,

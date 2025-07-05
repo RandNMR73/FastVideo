@@ -216,7 +216,8 @@ def shard_parquet_files_across_sp_groups_and_workers(
         # Distribute files to shards using a greedy approach
         logger.info("Distributing files to shards...")
         for file, length in zip(reversed(sorted_files),
-                                reversed(sorted_lengths), strict=False):
+                                reversed(sorted_lengths),
+                                strict=False):
             # Find shard with minimum current length
             target_shard = np.argmin(shard_total_samples)
             shard_parquet_files[target_shard].append(file)
