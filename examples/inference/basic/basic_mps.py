@@ -1,5 +1,5 @@
 from fastvideo import VideoGenerator, PipelineConfig
-from fastvideo.v1.configs.sample import SamplingParam
+from fastvideo.configs.sample import SamplingParam
 
 def main():
     config = PipelineConfig.from_pretrained("Wan-AI/Wan2.1-T2V-1.3B-Diffusers")
@@ -9,8 +9,8 @@ def main():
         "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
         pipeline_config=config,
         use_fsdp_inference=False,      # Disable FSDP for MPS
-        use_cpu_offload=True,          
-        text_encoder_offload=True,    
+        dit_cpu_offload=True,          
+        text_encoder_cpu_offload=True,    
         pin_cpu_memory=True,           
         disable_autocast=False,        
         num_gpus=1,      

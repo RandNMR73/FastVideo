@@ -33,7 +33,7 @@ dependencies = [
     "wandb>=0.19.11", "loguru", "test-tube==0.7.5",
 
     # Miscellaneous Utilities
-    "tqdm", "PyYAML==6.0.1", "protobuf>=5.28.3",
+    "tqdm", "pytest", "PyYAML==6.0.1", "protobuf>=5.28.3",
     "gradio>=5.22.0", "moviepy==1.0.3", "flask",
     "flask_restful", "aiohttp", "huggingface_hub", "cloudpickle",
     # System & Monitoring Tools
@@ -70,7 +70,7 @@ test = [
 dev = [ "fastvideo[lint]", "fastvideo[test]", ]
 
 [project.scripts]
-fastvideo = "fastvideo.v1.entrypoints.cli.main:main"
+fastvideo = "fastvideo.entrypoints.cli.main:main"
 
 [tool.setuptools.packages.find]
 exclude = ["assets*", "docker*", "docs", "scripts*"]
@@ -139,3 +139,13 @@ column_limit = 80
 line_length = 80
 use_parentheses = true
 skip_gitignore = true
+
+
+[project.urls]
+Repository = "https://github.com/hao-ai-lab/FastVideo"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = "fastvideo"
+DisplayName = "FastVideo"
+Icon = "https://raw.githubusercontent.com/hao-ai-lab/FastVideo/main/comfyui/assets/logo.png"
