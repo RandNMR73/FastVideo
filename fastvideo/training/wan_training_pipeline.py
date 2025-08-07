@@ -6,7 +6,7 @@ from fastvideo.fastvideo_args import FastVideoArgs, TrainingArgs
 from fastvideo.logger import init_logger
 from fastvideo.models.schedulers.scheduling_flow_unipc_multistep import (
     FlowUniPCMultistepScheduler)
-from fastvideo.pipelines.wan.wan_pipeline import WanPipeline
+from fastvideo.pipelines.basic.wan.wan_pipeline import WanPipeline
 from fastvideo.training.training_pipeline import TrainingPipeline
 from fastvideo.utils import is_vsa_available
 
@@ -19,7 +19,7 @@ class WanTrainingPipeline(TrainingPipeline):
     """
     A training pipeline for Wan.
     """
-    _required_config_modules = ["scheduler", "transformer"]
+    _required_config_modules = ["scheduler", "transformer", "vae"]
 
     def initialize_pipeline(self, fastvideo_args: FastVideoArgs):
         self.modules["scheduler"] = FlowUniPCMultistepScheduler(
@@ -40,7 +40,7 @@ class WanTrainingPipeline(TrainingPipeline):
         args_copy.pipeline_config.vae_config.load_encoder = False
         validation_pipeline = WanPipeline.from_pretrained(
             training_args.model_path,
-            args=None,
+            args=args_copy,  # type: ignore
             inference_mode=True,
             loaded_modules={
                 "transformer": self.get_module("transformer"),

@@ -16,7 +16,8 @@ def main():
         num_gpus=1,
         use_fsdp_inference=True,
         # Adjust these offload parameters if you have < 32GB of VRAM
-        text_encoder_cpu_offload=False,
+        text_encoder_cpu_offload=True,
+        pin_cpu_memory=False,
         dit_cpu_offload=False,
         vae_cpu_offload=False,
         VSA_sparsity=0.8,
@@ -28,9 +29,7 @@ def main():
     sampling_param = SamplingParam.from_pretrained(model_name)
 
     prompt = (
-        "A curious raccoon peers through a vibrant field of yellow sunflowers, its eyes "
-        "wide with interest. The playful yet serene atmosphere is complemented by soft "
-        "natural light filtering through the petals. Mid-shot, warm and cheerful tones."
+        "A neon-lit alley in futuristic Tokyo during a heavy rainstorm at night. The puddles reflect glowing signs in kanji, advertising ramen, karaoke, and VR arcades. A woman in a translucent raincoat walks briskly with an LED umbrella. Steam rises from a street food cart, and a cat darts across the screen. Raindrops are visible on the camera lens, creating a cinematic bokeh effect."
     )
     start_time = time.perf_counter()
     video = generator.generate_video(prompt, output_path=OUTPUT_PATH, save_video=True, sampling_param=sampling_param)

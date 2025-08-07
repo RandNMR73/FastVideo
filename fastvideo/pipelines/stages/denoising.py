@@ -119,13 +119,13 @@ class DenoisingStage(PipelineStage):
         sp_group = sp_world_size > 1
         if sp_group:
             latents = rearrange(batch.latents,
-                                "b t (n s) h w -> b t n s h w",
+                                "b c (n t) h w -> b c n t h w",
                                 n=sp_world_size).contiguous()
             latents = latents[:, :, rank_in_sp_group, :, :, :]
             batch.latents = latents
             if batch.image_latent is not None:
                 image_latent = rearrange(batch.image_latent,
-                                         "b t (n s) h w -> b t n s h w",
+                                         "b c (n t) h w -> b c n t h w",
                                          n=sp_world_size).contiguous()
                 image_latent = image_latent[:, :, rank_in_sp_group, :, :, :]
                 batch.image_latent = image_latent
@@ -228,10 +228,17 @@ class DenoisingStage(PipelineStage):
                             self.attn_metadata_builder = self.attn_metadata_builder_cls(
                             )
                             # TODO(will): clean this up
-                            attn_metadata = self.attn_metadata_builder.build(
-                                current_timestep=i,
-                                forward_batch=batch,
-                                fastvideo_args=fastvideo_args,
+                            attn_metadata = self.attn_metadata_builder.build(  # type: ignore
+                                current_timestep=i,  # type: ignore
+                                raw_latent_shape=batch.
+                                raw_latent_shape[2:5],  # type: ignore
+                                patch_size=fastvideo_args.
+                                pipeline_config.  # type: ignore
+                                dit_config.patch_size,  # type: ignore
+                                STA_param=batch.STA_param,  # type: ignore
+                                VSA_sparsity=fastvideo_args.
+                                VSA_sparsity,  # type: ignore
+                                device=get_local_torch_device(),
                             )
                             assert attn_metadata is not None, "attn_metadata cannot be None"
                         else:
@@ -708,10 +715,8 @@ class DmdDenoisingStage(DenoisingStage):
                 with torch.autocast(device_type="cuda",
                                     dtype=target_dtype,
                                     enabled=autocast_enabled):
-                    if (st_attn_available
-                            and self.attn_backend == SlidingTileAttentionBackend
-                        ) or (vsa_available and self.attn_backend
-                              == VideoSparseAttentionBackend):
+                    if (vsa_available and self.attn_backend
+                            == VideoSparseAttentionBackend):
                         self.attn_metadata_builder_cls = self.attn_backend.get_builder_cls(
                         )
 
@@ -719,11 +724,18 @@ class DmdDenoisingStage(DenoisingStage):
                             self.attn_metadata_builder = self.attn_metadata_builder_cls(
                             )
                             # TODO(will): clean this up
-                            attn_metadata = self.attn_metadata_builder.build(
-                                current_timestep=i,
-                                forward_batch=batch,
-                                fastvideo_args=fastvideo_args,
-                            )
+                            attn_metadata = self.attn_metadata_builder.build(  # type: ignore
+                                current_timestep=i,  # type: ignore
+                                raw_latent_shape=batch.
+                                raw_latent_shape[2:5],  # type: ignore
+                                patch_size=fastvideo_args.
+                                pipeline_config.  # type: ignore
+                                dit_config.patch_size,  # type: ignore
+                                STA_param=batch.STA_param,  # type: ignore
+                                VSA_sparsity=fastvideo_args.
+                                VSA_sparsity,  # type: ignore
+                                device=get_local_torch_device(),  # type: ignore
+                            )  # type: ignore
                             assert attn_metadata is not None, "attn_metadata cannot be None"
                         else:
                             attn_metadata = None
@@ -758,9 +770,7 @@ class DmdDenoisingStage(DenoisingStage):
 
                     if i < len(timesteps) - 1:
                         next_timestep = timesteps[i + 1] * torch.ones(
-                            pred_video.shape[:2],
-                            dtype=torch.long,
-                            device=pred_video.device)
+                            [1], dtype=torch.long, device=pred_video.device)
                         noise = torch.randn(video_raw_latent_shape,
                                             device=self.device,
                                             dtype=pred_video.dtype)
@@ -771,8 +781,7 @@ class DmdDenoisingStage(DenoisingStage):
                             noise = noise[:, rank_in_sp_group, :, :, :, :]
                         latents = self.scheduler.add_noise(
                             pred_video.flatten(0, 1), noise.flatten(0, 1),
-                            next_timestep.flatten(0, 1)).unflatten(
-                                0, pred_video.shape[:2])
+                            next_timestep).unflatten(0, pred_video.shape[:2])
                     else:
                         latents = pred_video
 

@@ -20,9 +20,10 @@ class SamplingParam:
 
     # Text inputs
     prompt: str | list[str] | None = None
-    negative_prompt: str | None = None
+    negative_prompt: str = "Bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, still picture, messy background, three legs, many people in the background, walking backwards"
     prompt_path: str | None = None
     output_path: str = "outputs/"
+    output_video_name: str | None = None
 
     # Batch info
     num_videos_per_prompt: int = 1
@@ -105,6 +106,12 @@ class SamplingParam:
             type=str,
             default=SamplingParam.output_path,
             help="Path to save the generated video",
+        )
+        parser.add_argument(
+            "--output-video-name",
+            type=str,
+            default=SamplingParam.output_video_name,
+            help="Name of the output video",
         )
         parser.add_argument(
             "--num-videos-per-prompt",

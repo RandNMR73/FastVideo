@@ -26,7 +26,7 @@ class ExecutionMode(str, Enum):
     Inherits from str to allow string comparison for backward compatibility.
     """
     INFERENCE = "inference"
-    PREPROCESSING = "preprocessing"
+    PREPROCESS = "preprocess"
     FINETUNING = "finetuning"
     DISTILLATION = "distillation"
 
@@ -138,6 +138,9 @@ class FastVideoArgs:
 
     # VSA parameters
     VSA_sparsity: float = 0.0  # inference/validation sparsity
+
+    # Master port for distributed training/inference
+    master_port: int | None = None
 
     # Stage verification
     enable_stage_verification: bool = True
@@ -305,8 +308,9 @@ class FastVideoArgs:
         parser.add_argument(
             "--enable-torch-compile",
             action=StoreBoolean,
-            help=
-            "Use torch.compile for speeding up STA inference without teacache",
+            default=FastVideoArgs.enable_torch_compile,
+            help="Use torch.compile to speed up DiT inference." +
+            "However, will likely cause precision drifts. See (https://github.com/pytorch/pytorch/issues/145213)",
         )
 
         parser.add_argument(
@@ -360,6 +364,14 @@ class FastVideoArgs:
             help="Validation sparsity for VSA",
         )
 
+        # Master port for distributed training/inference
+        parser.add_argument(
+            "--master-port",
+            type=int,
+            default=FastVideoArgs.master_port,
+            help="Master port for distributed training/inference",
+        )
+
         # Stage verification
         parser.add_argument(
             "--enable-stage-verification",
@@ -367,7 +379,6 @@ class FastVideoArgs:
             default=FastVideoArgs.enable_stage_verification,
             help="Enable input/output verification for pipeline stages",
         )
-
         # Add pipeline configuration arguments
         PipelineConfig.add_cli_args(parser)
 
@@ -460,9 +471,8 @@ class FastVideoArgs:
                 "Mode is 'training' but inference_mode is True. Setting inference_mode to False."
             )
             self.inference_mode = False
-        elif self.mode in [
-                ExecutionMode.INFERENCE, ExecutionMode.PREPROCESSING
-        ] and not self.inference_mode:
+        elif self.mode in [ExecutionMode.INFERENCE, ExecutionMode.PREPROCESS
+                           ] and not self.inference_mode:
             logger.warning(
                 "Mode is '%s' but inference_mode is False. Setting inference_mode to True.",
                 self.mode)
@@ -487,22 +497,16 @@ class FastVideoArgs:
         if self.num_gpus < max(self.tp_size, self.sp_size):
             self.num_gpus = max(self.tp_size, self.sp_size)
 
-        if self.enable_torch_compile and self.num_gpus > 1:
-            logger.warning(
-                "Currently torch compile does not work with multi-gpu. Setting enable_torch_compile to False"
-            )
-            self.enable_torch_compile = False
-
         if self.pipeline_config is None:
             raise ValueError("pipeline_config is not set in FastVideoArgs")
 
         self.pipeline_config.check_pipeline_config()
 
         # Add preprocessing config validation if needed
-        if self.mode == ExecutionMode.PREPROCESSING:
+        if self.mode == ExecutionMode.PREPROCESS:
             if self.preprocess_config is None:
                 raise ValueError(
-                    "preprocess_config is not set in FastVideoArgs when mode is PREPROCESSING"
+                    "preprocess_config is not set in FastVideoArgs when mode is PREPROCESS"
                 )
             if self.preprocess_config.model_path == "":
                 self.preprocess_config.model_path = self.model_path
@@ -605,7 +609,7 @@ class TrainingArgs(FastVideoArgs):
     output_dir: str = ""
     checkpoints_total_limit: int = 0
     checkpointing_steps: int = 0
-    resume_from_checkpoint: bool = False
+    resume_from_checkpoint: str = ""  # specify the checkpoint folder to resume from
 
     # optimizer & scheduler
     num_train_epochs: int = 0
@@ -618,7 +622,6 @@ class TrainingArgs(FastVideoArgs):
     max_grad_norm: float = 0.0
     enable_gradient_checkpointing_type: str | None = None
     selective_checkpointing: float = 0.0
-    allow_tf32: bool = False
     mixed_precision: str = ""
     train_sp_batch_size: int = 0
     fsdp_sharding_startegy: str = ""
@@ -631,6 +634,7 @@ class TrainingArgs(FastVideoArgs):
     num_euler_timesteps: int = 0
     lr_num_cycles: int = 0
     lr_power: float = 0.0
+    min_lr_ratio: float = 0.5  # minimum learning rate ratio for cosine_with_min_lr scheduler
     not_apply_cfg_solver: bool = False
     distill_cfg: float = 0.0
     scheduler_type: str = ""
@@ -654,6 +658,19 @@ class TrainingArgs(FastVideoArgs):
     lora_rank: int | None = None
     lora_alpha: int | None = None
     lora_training: bool = False
+
+    # distillation args
+    generator_update_interval: int = 5
+    min_timestep_ratio: float = 0.2
+    max_timestep_ratio: float = 0.98
+    real_score_guidance_scale: float = 3.5
+    fake_score_learning_rate: float = 0.0  # separate learning rate for fake_score_transformer, if 0.0, use learning_rate
+    fake_score_lr_scheduler: str = "constant"  # separate lr scheduler for fake_score_transformer, if not set, use lr_scheduler
+    training_state_checkpointing_steps: int = 0  # for resuming training
+    weight_only_checkpointing_steps: int = 0  # for inference
+    log_visualization: bool = False
+    # simulate generator forward to match inference
+    simulate_generator_forward: bool = False
 
     @classmethod
     def from_cli_args(cls, args: argparse.Namespace) -> "TrainingArgs":
@@ -813,6 +830,15 @@ class TrainingArgs(FastVideoArgs):
         parser.add_argument("--checkpointing-steps",
                             type=int,
                             help="Steps between checkpoints")
+        parser.add_argument(
+            "--training-state-checkpointing-steps",
+            type=int,
+            help=
+            "Steps between training state checkpoints (for resuming training)")
+        parser.add_argument(
+            "--weight-only-checkpointing-steps",
+            type=int,
+            help="Steps between weight-only checkpoints (for inference)")
         parser.add_argument("--resume-from-checkpoint",
                             type=str,
                             help="Path to checkpoint to resume from")
@@ -856,9 +882,6 @@ class TrainingArgs(FastVideoArgs):
         parser.add_argument("--selective-checkpointing",
                             type=float,
                             help="Selective checkpointing threshold")
-        parser.add_argument("--allow-tf32",
-                            action=StoreBoolean,
-                            help="Whether to allow TF32")
         parser.add_argument("--mixed-precision",
                             type=str,
                             help="Mixed precision training type")
@@ -906,6 +929,11 @@ class TrainingArgs(FastVideoArgs):
         parser.add_argument("--lr-power",
                             type=float,
                             help="Learning rate power")
+        parser.add_argument(
+            "--min-lr-ratio",
+            type=float,
+            default=TrainingArgs.min_lr_ratio,
+            help="Minimum learning rate ratio for cosine_with_min_lr scheduler")
         parser.add_argument("--not-apply-cfg-solver",
                             action=StoreBoolean,
                             help="Whether to not apply CFG solver")
@@ -954,4 +982,44 @@ class TrainingArgs(FastVideoArgs):
         parser.add_argument("--lora-rank", type=int, help="LoRA rank")
         parser.add_argument("--lora-alpha", type=int, help="LoRA alpha")
 
+        # Distillation arguments
+        parser.add_argument("--generator-update-interval",
+                            type=int,
+                            default=TrainingArgs.generator_update_interval,
+                            help="Ratio of student updates to critic updates.")
+        parser.add_argument("--min-timestep-ratio",
+                            type=float,
+                            default=TrainingArgs.min_timestep_ratio,
+                            help="Minimum step ratio")
+        parser.add_argument("--max-timestep-ratio",
+                            type=float,
+                            default=TrainingArgs.max_timestep_ratio,
+                            help="Maximum step ratio")
+        parser.add_argument("--real-score-guidance-scale",
+                            type=float,
+                            default=TrainingArgs.real_score_guidance_scale,
+                            help="Teacher guidance scale")
+        parser.add_argument("--fake-score-learning-rate",
+                            type=float,
+                            default=TrainingArgs.fake_score_learning_rate,
+                            help="Learning rate for fake score transformer")
+        parser.add_argument(
+            "--fake-score-lr-scheduler",
+            type=str,
+            default=TrainingArgs.fake_score_lr_scheduler,
+            help="Learning rate scheduler for fake score transformer")
+        parser.add_argument("--log-visualization",
+                            action=StoreBoolean,
+                            help="Whether to log visualization")
+        parser.add_argument(
+            "--simulate-generator-forward",
+            action=StoreBoolean,
+            help="Whether to simulate generator forward to match inference")
+
         return parser
+
+
+def parse_int_list(value: str) -> list[int]:
+    if not value:
+        return []
+    return [int(x.strip()) for x in value.split(",")]

@@ -97,6 +97,10 @@ class ComposedPipelineBase(ABC):
                 self.initialize_validation_pipeline(self.training_args)
 
         self.initialize_pipeline(self.fastvideo_args)
+        if self.fastvideo_args.enable_torch_compile:
+            self.modules["transformer"] = torch.compile(
+                self.modules["transformer"])
+            logger.info("Torch Compile enabled for DiT")
 
         if not self.fastvideo_args.training_mode:
             logger.info("Creating pipeline stages...")
@@ -234,6 +238,9 @@ class ComposedPipelineBase(ABC):
         # remove keys that are not pipeline modules
         model_index.pop("_class_name")
         model_index.pop("_diffusers_version")
+        # @TODO(Wei): Temporary hack
+        model_index.pop("boundary_ratio", None)
+        model_index.pop("expand_timesteps", None)
 
         # some sanity checks
         assert len(
@@ -242,8 +249,11 @@ class ComposedPipelineBase(ABC):
 
         for module_name in self.required_config_modules:
             if module_name not in model_index:
-                raise ValueError(
-                    f"model_index.json must contain a {module_name} module")
+                logger.warning(
+                    "model_index.json does not contain a %s module, adding %s to model_index",
+                    module_name, module_name)
+                if 'transformer' in module_name:
+                    model_index[module_name] = model_index['transformer']
 
         # all the component models used by the pipeline
         required_modules = self.required_config_modules
@@ -252,6 +262,8 @@ class ComposedPipelineBase(ABC):
         modules = {}
         for module_name, (transformers_or_diffusers,
                           architecture) in model_index.items():
+            if transformers_or_diffusers is None:
+                continue
             if module_name not in required_modules:
                 logger.info("Skipping module %s", module_name)
                 continue
@@ -259,7 +271,12 @@ class ComposedPipelineBase(ABC):
                 logger.info("Using module %s already provided", module_name)
                 modules[module_name] = loaded_modules[module_name]
                 continue
-            component_model_path = os.path.join(self.model_path, module_name)
+            if 'transformer' in module_name:
+                loading_module_name = module_name.split("_")[-1]
+            else:
+                loading_module_name = module_name
+            component_model_path = os.path.join(self.model_path,
+                                                loading_module_name)
             module = PipelineComponentLoader.load_module(
                 module_name=module_name,
                 component_model_path=component_model_path,

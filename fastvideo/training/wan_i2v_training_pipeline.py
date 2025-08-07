@@ -12,8 +12,9 @@ from fastvideo.fastvideo_args import FastVideoArgs, TrainingArgs
 from fastvideo.logger import init_logger
 from fastvideo.models.schedulers.scheduling_flow_unipc_multistep import (
     FlowUniPCMultistepScheduler)
+from fastvideo.pipelines.basic.wan.wan_i2v_pipeline import (
+    WanImageToVideoPipeline)
 from fastvideo.pipelines.pipeline_batch_info import ForwardBatch, TrainingBatch
-from fastvideo.pipelines.wan.wan_i2v_pipeline import WanImageToVideoPipeline
 from fastvideo.training.training_pipeline import TrainingPipeline
 from fastvideo.utils import is_vsa_available, shallow_asdict
 
@@ -26,7 +27,7 @@ class WanI2VTrainingPipeline(TrainingPipeline):
     """
     A training pipeline for Wan.
     """
-    _required_config_modules = ["scheduler", "transformer"]
+    _required_config_modules = ["scheduler", "transformer", "vae"]
 
     def initialize_pipeline(self, fastvideo_args: FastVideoArgs):
         self.modules["scheduler"] = FlowUniPCMultistepScheduler(
@@ -62,9 +63,6 @@ class WanI2VTrainingPipeline(TrainingPipeline):
             dit_cpu_offload=True)
 
     def _get_next_batch(self, training_batch: TrainingBatch) -> TrainingBatch:
-        assert self.training_args is not None
-        assert self.train_dataloader is not None
-
         batch = next(self.train_loader_iter, None)  # type: ignore
         if batch is None:
             self.current_epoch += 1
@@ -102,12 +100,6 @@ class WanI2VTrainingPipeline(TrainingPipeline):
     def _prepare_dit_inputs(self,
                             training_batch: TrainingBatch) -> TrainingBatch:
         """Override to properly handle I2V concatenation - call parent first, then concatenate image conditioning."""
-        assert self.training_args is not None
-        assert training_batch.latents is not None
-        assert training_batch.encoder_hidden_states is not None
-        assert training_batch.encoder_attention_mask is not None
-        assert self.noise_random_generator is not None
-        assert training_batch.image_latents is not None
 
         # First, call parent method to prepare noise, timesteps, etc. for video latents
         training_batch = super()._prepare_dit_inputs(training_batch)
@@ -144,12 +136,6 @@ class WanI2VTrainingPipeline(TrainingPipeline):
 
     def _build_input_kwargs(self,
                             training_batch: TrainingBatch) -> TrainingBatch:
-        assert self.training_args is not None
-        assert training_batch.noisy_model_input is not None
-        assert training_batch.encoder_hidden_states is not None
-        assert training_batch.encoder_attention_mask is not None
-        assert training_batch.timesteps is not None
-        assert training_batch.image_embeds is not None
 
         # Image Embeds for conditioning
         image_embeds = training_batch.image_embeds
@@ -186,6 +172,7 @@ class WanI2VTrainingPipeline(TrainingPipeline):
         sampling_param.image_path = validation_batch['video_path']
         sampling_param.num_inference_steps = num_inference_steps
         sampling_param.data_type = "video"
+        assert self.seed is not None
         sampling_param.seed = self.seed
 
         latents_size = [(sampling_param.num_frames - 1) // 4 + 1,
