@@ -54,6 +54,7 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         layer.register_parameter("weight", weight)
         set_weight_attrs(weight, extra_weight_attrs)
 
+    @torch.compile
     def apply(self, layer: torch.nn.Module, x: torch.Tensor, bias: torch.Tensor | None = None) -> torch.Tensor:
         """Apply FP8 quantized computation."""
         if not hasattr(layer, '_fp8_weight') or layer._fp8_weight is None:
@@ -117,39 +118,3 @@ class FP8Config(QuantizationConfig):
         if isinstance(layer, LinearBase):
             return FP8QuantizeMethod()
         return None
-
-
-def convert_model_to_fp8(model: torch.nn.Module) -> torch.nn.Module:
-    """
-    Convert an existing model to use FP8 quantization.
-    
-    Args:
-        model: The model to convert
-        
-    Returns:
-        The model with FP8 quantization applied
-    """
-    from fastvideo.layers.linear import LinearBase
-    
-    fp8_config = FP8Config()
-    
-    # Convert all linear layers to use FP8 quantization
-    def convert_layer_recursive(module: torch.nn.Module, prefix: str = ""):
-        for name, child in module.named_children():
-            child_prefix = f"{prefix}.{name}" if prefix else name
-            
-            if isinstance(child, LinearBase):
-                # Replace the quantization method
-                quant_method = fp8_config.get_quant_method(child, child_prefix)
-                if quant_method is not None:
-                    child.quant_method = quant_method
-                    child.quant_config = fp8_config
-                    # Process weights to convert to FP8
-                    quant_method.process_weights_after_loading(child)
-            else:
-                # Recursively process child modules
-                convert_layer_recursive(child, child_prefix)
-    
-    convert_layer_recursive(model)
-    return model
-    
