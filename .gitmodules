@@ -1,3 +1,6 @@
 [submodule "csrc/attn/tk"]
 	path = csrc/attn/tk
 	url = https://github.com/HazyResearch/ThunderKittens.git
+[submodule "fastvideo/DeepGEMM"]
+	path = fastvideo/DeepGEMM
+	url = https://github.com/deepseek-ai/DeepGEMM
