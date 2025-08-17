@@ -55,13 +55,14 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         set_weight_attrs(weight, {"input_dim": 1, "output_dim": 0})
         layer.register_parameter("weight", weight)
         set_weight_attrs(weight, extra_weight_attrs)
-
-    def apply(self, layer: torch.nn.Module, x: torch.Tensor, bias: torch.Tensor | None = None) -> torch.Tensor:
-        """Apply FP8 quantized computation."""
+        
         if not hasattr(layer, '_fp8_weight') or layer._fp8_weight is None:
             self.weight_fp8, self.weight_scale = per_block_cast_to_fp8_triton(layer.weight)
             layer._fp8_weight = self.weight_fp8
             layer._fp8_weight_scale = self.weight_scale
+
+    def apply(self, layer: torch.nn.Module, x: torch.Tensor, bias: torch.Tensor | None = None) -> torch.Tensor:
+        """Apply FP8 quantized computation."""
         
         out_dim = layer.weight.shape[0]
         # Need contiguous tensors for collectives.
