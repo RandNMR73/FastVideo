@@ -54,7 +54,6 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         layer.register_parameter("weight", weight)
         set_weight_attrs(weight, extra_weight_attrs)
 
-    @torch.compile
     def apply(self, layer: torch.nn.Module, x: torch.Tensor, bias: torch.Tensor | None = None) -> torch.Tensor:
         """Apply FP8 quantized computation."""
         if not hasattr(layer, '_fp8_weight') or layer._fp8_weight is None:
