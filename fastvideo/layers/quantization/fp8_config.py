@@ -1,13 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Adapted from https://github.com/character-ai/pipelining-sft/blob/main/models/deepseek_v3/fp8_layers.py
 from fastvideo.layers.quantization.base_config import QuantizationConfig, QuantizeMethodBase
-from fastvideo.layers.quantization import register_quantization_config
 import torch
 from torch.nn.parameter import Parameter
 
 from typing import Any, Tuple
 import deep_gemm
-from deep_gemm import ceil_div, get_col_major_tma_aligned_tensor
+from deep_gemm import ceil_div
 from fastvideo.models.utils import set_weight_attrs
 
 block_size = 128
@@ -84,10 +83,6 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         out = torch.zeros((x_fp8.shape[0], out_dim), device=x.device, dtype=x.dtype)
         deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale), (layer._fp8_weight, layer._fp8_weight_scale), out)
         
-        # Add bias if provided
-        if bias is not None:
-            out = out + bias
-        
         # Restore original shape
         if len(original_shape) == 3:
             out = out.view(original_shape[0], original_shape[1], out_dim)
@@ -95,7 +90,6 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         return out
         
 
-@register_quantization_config("fp8")
 class FP8Config(QuantizationConfig):
     def __init__(self):
         super().__init__()
