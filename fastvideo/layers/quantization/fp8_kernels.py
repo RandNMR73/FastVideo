@@ -117,7 +117,7 @@ def per_token_cast_to_fp8_triton(x: torch.Tensor) -> Tuple[torch.Tensor, torch.T
         scales.stride(0),
         scales.stride(1),
         BLOCK_SIZE=BLOCK_SIZE,
-        num_warps=4,  # Tune based on your GPU
+        num_warps=8,  # Tune based on your GPU
     )
     return x_fp8_padded[:, :N], scales
 
