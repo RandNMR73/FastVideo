@@ -6,7 +6,7 @@ from torch.nn.parameter import Parameter
 
 from typing import Any, Tuple
 import deep_gemm
-from deep_gemm import ceil_div
+from deep_gemm import ceil_div, get_mn_major_tma_aligned_tensor
 from fastvideo.models.utils import set_weight_attrs
 
 block_size = 128
@@ -53,21 +53,10 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         layer.register_parameter("weight", weight)
         set_weight_attrs(weight, extra_weight_attrs)
 
-    def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
-        """Convert weights to FP8 after loading from checkpoint."""
-        if hasattr(layer, 'weight') and layer.weight is not None:
-            # Convert the loaded weights to FP8
-            self.weight_fp8, self.weight_scale = per_block_cast_to_fp8(layer.weight.data)
-            # Store on the layer for later use
-            layer._fp8_weight = self.weight_fp8
-            layer._fp8_weight_scale = self.weight_scale
-
     def apply(self, layer: torch.nn.Module, x: torch.Tensor, bias: torch.Tensor | None = None) -> torch.Tensor:
         """Apply FP8 quantized computation."""
-        # Ensure we have FP8 weights
         if not hasattr(layer, '_fp8_weight') or layer._fp8_weight is None:
-            # Fallback to converting on-the-fly if not already converted
-            self.weight_fp8, self.weight_scale = per_block_cast_to_fp8(layer.weight.data)
+            self.weight_fp8, self.weight_scale = per_block_cast_to_fp8(layer.weight)
             layer._fp8_weight = self.weight_fp8
             layer._fp8_weight_scale = self.weight_scale
         
@@ -75,15 +64,23 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         # Need contiguous tensors for collectives.
         assert x.dtype == torch.bfloat16, f"only allow bf16 inputs to fp8 linear, got {x.dtype}"
         
-        # Convert input to FP8
         x_fp8, x_scale = per_token_cast_to_fp8(x.view(-1, x.shape[-1]))
+        print(f"x_scale.dtype: {x_scale.dtype}")
+        x_scale = get_mn_major_tma_aligned_tensor(x_scale)
         original_shape = x.shape
-        
-        # Perform FP8 GEMM
         out = torch.zeros((x_fp8.shape[0], out_dim), device=x.device, dtype=x.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale), (layer._fp8_weight, layer._fp8_weight_scale), out)
+        deep_gemm.fp8_gemm_nt(
+            (x_fp8, x_scale),
+            (layer._fp8_weight, layer._fp8_weight_scale),
+            out,
+            disable_ue8m0_cast=True
+        )
         
-        # Restore original shape
+        if bias is not None:
+            if bias.device != out.device or bias.dtype != out.dtype:
+                bias = bias.to(device=out.device, dtype=out.dtype)
+            out = out + bias
+        
         if len(original_shape) == 3:
             out = out.view(original_shape[0], original_shape[1], out_dim)
         

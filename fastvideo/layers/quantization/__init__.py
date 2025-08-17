@@ -54,10 +54,12 @@ def get_quantization_config(quantization: str) -> type[QuantizationConfig]:
     # Update the `method_to_config` with customized quantization methods.
     method_to_config.update(_CUSTOMIZED_METHOD_TO_QUANT_CONFIG)
 
+    if quantization == "fp8":
+        from fastvideo.layers.quantization.fp8_config import FP8Config
+        method_to_config["fp8"] = FP8Config
+
     return method_to_config[quantization]
 
-
-from fastvideo.layers.quantization import fp8_config  # noqa: E402
 
 all = [
     "QuantizationMethods",
