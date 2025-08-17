@@ -2,9 +2,7 @@ from typing import Literal, get_args
 
 from fastvideo.layers.quantization.base_config import QuantizationConfig
 
-from fastvideo.layers.quantization import fp8_config  # This will register FP8Config
-
-QuantizationMethods = Literal[None]
+QuantizationMethods = Literal[None, "fp8"]
 
 QUANTIZATION_METHODS: list[str] = list(get_args(QuantizationMethods))
 
@@ -58,6 +56,8 @@ def get_quantization_config(quantization: str) -> type[QuantizationConfig]:
 
     return method_to_config[quantization]
 
+
+from fastvideo.layers.quantization import fp8_config  # noqa: E402
 
 all = [
     "QuantizationMethods",
