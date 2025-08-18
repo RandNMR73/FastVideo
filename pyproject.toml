@@ -50,6 +50,8 @@ dependencies = [
 
     # Preprocessing Dependencies
     "torchcodec"
+
+    triton=3.4.0
 ]
 
 [tool.uv]
