@@ -60,7 +60,7 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         """Apply FP8 quantized computation."""
         if not hasattr(layer, '_fp8_weight') or layer._fp8_weight is None:
             # self.weight_fp8, self.weight_scale = per_block_cast_to_fp8(layer.weight)
-            self.weight_fp8, self.weight_scale = layer.weight, layer.weight  # DUMMY
+            self.weight_fp8, self.weight_scale = layer.weight.to(dtype=torch.float8_e4m3fn), layer.weight.to(dtype=torch.float8_e4m3fn)  # DUMMY
             layer._fp8_weight = self.weight_fp8
             layer._fp8_weight_scale = self.weight_scale
         
@@ -69,7 +69,7 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         assert x.dtype == torch.bfloat16, f"only allow bf16 inputs to fp8 linear, got {x.dtype}"
         
         # x_fp8, x_scale = per_token_cast_to_fp8(x.view(-1, x.shape[-1]))
-        x_fp8, x_scale = x, x  # DUMMY
+        x_fp8, x_scale = x.to(dtype=torch.float8_e4m3fn), x.to(dtype=torch.float8_e4m3fn)  # DUMMY
         # print(f"x_scale.dtype: {x_scale.dtype}")
         x_scale = get_mn_major_tma_aligned_tensor(x_scale)
         original_shape = x.shape
