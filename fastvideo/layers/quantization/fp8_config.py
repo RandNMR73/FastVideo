@@ -76,7 +76,7 @@ class FP8QuantizeMethod(QuantizeMethodBase):
             (x_fp8, x_scale),
             (layer._fp8_weight, layer._fp8_weight_scale),
             out,
-            disable_ue8m0_cast=True  # TODO: need to set flag based on sm90/sm100
+            # disable_ue8m0_cast=True  # TODO: need to set flag based on sm90/sm100
         )
         
         if bias is not None:
