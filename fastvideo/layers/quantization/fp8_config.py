@@ -8,7 +8,7 @@ from typing import Any, Tuple
 import deep_gemm
 from deep_gemm import ceil_div, get_mn_major_tma_aligned_tensor
 from fastvideo.models.utils import set_weight_attrs
-import time 
+# import time 
 
 block_size = 128
 
@@ -58,11 +58,11 @@ class FP8QuantizeMethod(QuantizeMethodBase):
     def apply(self, layer: torch.nn.Module, x: torch.Tensor, bias: torch.Tensor | None = None) -> torch.Tensor:
         """Apply FP8 quantized computation."""
         if not hasattr(layer, '_fp8_weight') or layer._fp8_weight is None:
-            start_time = time.time()
+            # start_time = time.time()
             self.weight_fp8, self.weight_scale = per_block_cast_to_fp8(layer.weight)
             torch.cuda.synchronize()
-            end_time = time.time()
-            print(f"Time taken to cast weight to FP8: {end_time - start_time} seconds")
+            # end_time = time.time()
+            # print(f"Time taken to cast weight to FP8: {end_time - start_time} seconds")
             layer._fp8_weight = self.weight_fp8
             layer._fp8_weight_scale = self.weight_scale
         
@@ -70,16 +70,16 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         # Need contiguous tensors for collectives.
         assert x.dtype == torch.bfloat16, f"only allow bf16 inputs to fp8 linear, got {x.dtype}"
         
-        start_time = time.time()
+        # start_time = time.time()
         x_fp8, x_scale = per_token_cast_to_fp8(x.view(-1, x.shape[-1]))
         torch.cuda.synchronize()
-        end_time = time.time()
-        print(f"Time taken to cast input to FP8: {end_time - start_time} seconds")
+        # end_time = time.time()
+        # print(f"Time taken to cast input to FP8: {end_time - start_time} seconds")
         # print(f"x_scale.dtype: {x_scale.dtype}")
         x_scale = get_mn_major_tma_aligned_tensor(x_scale)
         original_shape = x.shape
         out = torch.zeros((x_fp8.shape[0], out_dim), device=x.device, dtype=x.dtype)
-        start_time = time.time()
+        # start_time = time.time()
         deep_gemm.fp8_gemm_nt(
             (x_fp8, x_scale),
             (layer._fp8_weight, layer._fp8_weight_scale),
@@ -87,8 +87,8 @@ class FP8QuantizeMethod(QuantizeMethodBase):
             # disable_ue8m0_cast=False  # TODO: need to set flag based on sm90/sm100
         )   
         torch.cuda.synchronize()
-        end_time = time.time()
-        print(f"Time taken to perform FP8 GEMM: {end_time - start_time} seconds")
+        # end_time = time.time()
+        # print(f"Time taken to perform FP8 GEMM: {end_time - start_time} seconds")
         
         if bias is not None:
             if bias.device != out.device or bias.dtype != out.dtype:
