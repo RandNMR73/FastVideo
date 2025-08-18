@@ -194,6 +194,10 @@ def benchmark_gemm_performance():
         torch.cuda.empty_cache()
         gc.collect()
         
+        # Create traces directory if it doesn't exist
+        import os
+        os.makedirs("./traces", exist_ok=True)
+        
         # Benchmark configurations
         batch_sizes = [1, 4, 8, 16, 32]
         hidden_sizes = [512, 1024, 2048, 4096]
@@ -286,10 +290,9 @@ def benchmark_gemm_performance():
                             _ = linear_fp8(test_input)
                             prof.step()
                 
-                # Export Chrome trace for FP8
-                chrome_trace_fp8 = f"./traces/fp8_chrome_trace_b{batch_size}_h{hidden_size}.json"
-                prof.export_chrome_trace(chrome_trace_fp8)
-                print(f"    ✓ FP8 Chrome trace exported to: {chrome_trace_fp8}")
+                # The trace is automatically saved by tensorboard_trace_handler
+                chrome_trace_fp8 = f"./traces/fp8_b{batch_size}_h{hidden_size}.pt.trace.json"
+                print(f"    ✓ FP8 trace automatically saved to: {chrome_trace_fp8}")
                 
                 torch.cuda.synchronize()
                 fp8_time = time.time() - start_time
@@ -333,10 +336,9 @@ def benchmark_gemm_performance():
                             _ = linear_unquant(test_input)
                             prof.step()
                 
-                # Export Chrome trace for unquantized
-                chrome_trace_unquant = f"./traces/unquant_chrome_trace_b{batch_size}_h{hidden_size}.json"
-                prof.export_chrome_trace(chrome_trace_unquant)
-                print(f"    ✓ Unquantized Chrome trace exported to: {chrome_trace_unquant}")
+                # The trace is automatically saved by tensorboard_trace_handler
+                chrome_trace_unquant = f"./traces/unquant_b{batch_size}_h{hidden_size}.pt.trace.json"
+                print(f"    ✓ Unquantized trace automatically saved to: {chrome_trace_unquant}")
                 
                 start_time = time.time()
                 with torch.no_grad():
