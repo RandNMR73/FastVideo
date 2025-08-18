@@ -4,6 +4,7 @@ Test script to verify FP8 quantization integration.
 """
 
 import torch
+import torch.profiler
 import time
 import gc
 from fastvideo.layers.quantization.fp8_config import FP8Config, FP8QuantizeMethod
@@ -251,14 +252,44 @@ def benchmark_gemm_performance():
                 
                 torch.cuda.synchronize()
                 
-                # Benchmark FP8 quantized
-                print("  Benchmarking FP8 quantized...")
+                # Benchmark FP8 quantized with PyTorch profiler
+                print("  Benchmarking FP8 quantized with profiler...")
                 start_time = time.time()
                 torch.cuda.reset_peak_memory_stats()
                 
-                with torch.no_grad():
-                    for _ in range(num_iterations):
-                        _ = linear_fp8(test_input)
+                # Create trace filename for FP8
+                trace_filename_fp8 = f"fp8_trace_b{batch_size}_h{hidden_size}.json"
+                
+                with torch.profiler.profile(
+                    activities=[
+                        torch.profiler.ProfilerActivity.CPU,
+                        torch.profiler.ProfilerActivity.CUDA,
+                    ],
+                    schedule=torch.profiler.schedule(
+                        wait=0,
+                        warmup=5,
+                        active=num_iterations-5,
+                        repeat=1
+                    ),
+                    on_trace_ready=torch.profiler.tensorboard_trace_handler(
+                        dir_name="./traces",
+                        worker_name=f"fp8_b{batch_size}_h{hidden_size}"
+                    ),
+                    record_shapes=True,
+                    profile_memory=True,
+                    with_stack=True,
+                    with_flops=True,
+                    with_modules=True
+                ) as prof:
+                    with torch.no_grad():
+                        for i in range(num_iterations):
+                            _ = linear_fp8(test_input)
+                            prof.step()
+                
+                # Export Chrome trace for FP8
+                chrome_trace_fp8 = f"./traces/fp8_chrome_trace_b{batch_size}_h{hidden_size}.json"
+                prof.export_chrome_trace(chrome_trace_fp8)
+                print(f"    ✓ FP8 Chrome trace exported to: {chrome_trace_fp8}")
                 
                 torch.cuda.synchronize()
                 fp8_time = time.time() - start_time
@@ -268,10 +299,44 @@ def benchmark_gemm_performance():
                 fp8_throughput = num_iterations / fp8_time
                 fp8_tflops = (theoretical_tflops * num_iterations) / fp8_time
                 
-                # Benchmark unquantized
-                print("  Benchmarking unquantized...")
+                # Benchmark unquantized with PyTorch profiler
+                print("  Benchmarking unquantized with profiler...")
                 torch.cuda.empty_cache()
                 torch.cuda.reset_peak_memory_stats()
+                
+                # Create trace filename for unquantized
+                trace_filename_unquant = f"unquant_trace_b{batch_size}_h{hidden_size}.json"
+                
+                with torch.profiler.profile(
+                    activities=[
+                        torch.profiler.ProfilerActivity.CPU,
+                        torch.profiler.ProfilerActivity.CUDA,
+                    ],
+                    schedule=torch.profiler.schedule(
+                        wait=0,
+                        warmup=5,
+                        active=num_iterations-5,
+                        repeat=1
+                    ),
+                    on_trace_ready=torch.profiler.tensorboard_trace_handler(
+                        dir_name="./traces",
+                        worker_name=f"unquant_b{batch_size}_h{hidden_size}"
+                    ),
+                    record_shapes=True,
+                    profile_memory=True,
+                    with_stack=True,
+                    with_flops=True,
+                    with_modules=True
+                ) as prof:
+                    with torch.no_grad():
+                        for i in range(num_iterations):
+                            _ = linear_unquant(test_input)
+                            prof.step()
+                
+                # Export Chrome trace for unquantized
+                chrome_trace_unquant = f"./traces/unquant_chrome_trace_b{batch_size}_h{hidden_size}.json"
+                prof.export_chrome_trace(chrome_trace_unquant)
+                print(f"    ✓ Unquantized Chrome trace exported to: {chrome_trace_unquant}")
                 
                 start_time = time.time()
                 with torch.no_grad():
@@ -304,7 +369,9 @@ def benchmark_gemm_performance():
                     'unquant_tflops': unquant_tflops,
                     'unquant_memory_gb': unquant_memory,
                     'speedup': speedup,
-                    'tflops_speedup': tflops_speedup
+                    'tflops_speedup': tflops_speedup,
+                    'fp8_trace_file': chrome_trace_fp8,
+                    'unquant_trace_file': chrome_trace_unquant
                 }
                 results.append(result)
                 
@@ -350,6 +417,20 @@ def benchmark_gemm_performance():
             print(f"  🚀 FP8 quantization provides {avg_tflops_speedup:.2f}x TFLOPs improvement!")
         else:
             print(f"  ⚠️  FP8 quantization shows {avg_tflops_speedup:.2f}x TFLOPs performance")
+        
+        # Print trace file information
+        print(f"\n📊 Profiler Trace Files Generated:")
+        print(f"  All Chrome trace files have been saved to the './traces/' directory")
+        print(f"  To analyze bottlenecks:")
+        print(f"    1. SCP the trace files to your local machine:")
+        print(f"       scp -r user@remote:/path/to/fastvideo/traces/ ./local_traces/")
+        print(f"    2. Open Chrome and navigate to: chrome://tracing/")
+        print(f"    3. Load the .json trace files to view detailed performance analysis")
+        print(f"    4. Look for:")
+        print(f"       - CUDA kernel execution times")
+        print(f"       - Memory allocation patterns")
+        print(f"       - CPU-GPU synchronization overhead")
+        print(f"       - Quantization vs dequantization costs")
         
         return True
         
