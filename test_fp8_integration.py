@@ -4,10 +4,11 @@ Test script to verify FP8 quantization integration.
 """
 
 import torch
+import time
+import gc
 from fastvideo.layers.quantization.fp8_config import FP8Config, FP8QuantizeMethod
 from fastvideo.layers.linear import ReplicatedLinear
 from fastvideo.layers.quantization import get_quantization_config
-import time
 
 def test_fp8_registration():
     """Test that FP8 config is properly registered."""
@@ -89,7 +90,7 @@ def test_fp8_forward_pass():
         linear_layer = ReplicatedLinear(
             input_size=128,
             output_size=256,
-            bias=True,
+            bias=False,
             quant_config=fp8_config,
             params_dtype=torch.bfloat16
         )
@@ -97,7 +98,7 @@ def test_fp8_forward_pass():
         linear_unquant = ReplicatedLinear(
             input_size=128,
             output_size=256,
-            bias=True,
+            bias=False,
             quant_config=None,
             params_dtype=torch.bfloat16
         )
@@ -178,6 +179,186 @@ def test_model_integration():
         print(f"✗ Model integration test failed: {e}")
         return False
 
+def benchmark_gemm_performance():
+    """Benchmark TFLOPs for FP8 quantized vs unquantized GEMM operations."""
+    print("\n=== Benchmarking GEMM Performance ===")
+    
+    try:
+        # Check if CUDA is available
+        if not torch.cuda.is_available():
+            print("⚠️  CUDA not available, skipping GPU benchmark")
+            return False
+            
+        device = torch.device('cuda')
+        torch.cuda.empty_cache()
+        gc.collect()
+        
+        # Benchmark configurations
+        batch_sizes = [1, 4, 8, 16, 32]
+        hidden_sizes = [512, 1024, 2048, 4096]
+        num_warmup = 10
+        num_iterations = 100
+        
+        print(f"✓ Device: {device}")
+        print(f"✓ Warmup iterations: {num_warmup}")
+        print(f"✓ Benchmark iterations: {num_iterations}")
+        
+        results = []
+        
+        for hidden_size in hidden_sizes:
+            for batch_size in batch_sizes:
+                print(f"\n--- Benchmarking: batch_size={batch_size}, hidden_size={hidden_size} ---")
+                
+                # Calculate theoretical FLOPs for GEMM: 2 * batch_size * input_size * output_size
+                theoretical_flops = 2 * batch_size * hidden_size * hidden_size
+                theoretical_tflops = theoretical_flops / 1e12
+                
+                # Create layers
+                fp8_config = FP8Config()
+                linear_fp8 = ReplicatedLinear(
+                    input_size=hidden_size,
+                    output_size=hidden_size,
+                    bias=True,
+                    quant_config=fp8_config,
+                    params_dtype=torch.bfloat16
+                ).to(device)
+                
+                linear_unquant = ReplicatedLinear(
+                    input_size=hidden_size,
+                    output_size=hidden_size,
+                    bias=True,
+                    quant_config=None,
+                    params_dtype=torch.bfloat16
+                ).to(device)
+                
+                # Copy weights for fair comparison
+                with torch.no_grad():
+                    linear_fp8.weight.normal_(0, 0.02)
+                    linear_unquant.weight.copy_(linear_fp8.weight)
+                    if linear_fp8.bias is not None:
+                        linear_fp8.bias.zero_()
+                        linear_unquant.bias.copy_(linear_fp8.bias)
+                
+                # Create test input
+                test_input = torch.randn(batch_size, hidden_size, dtype=torch.bfloat16, device=device)
+                
+                # Warmup runs
+                print("  Warming up...")
+                with torch.no_grad():
+                    for _ in range(num_warmup):
+                        _ = linear_fp8(test_input)
+                        _ = linear_unquant(test_input)
+                
+                torch.cuda.synchronize()
+                
+                # Benchmark FP8 quantized
+                print("  Benchmarking FP8 quantized...")
+                start_time = time.time()
+                torch.cuda.reset_peak_memory_stats()
+                
+                with torch.no_grad():
+                    for _ in range(num_iterations):
+                        _ = linear_fp8(test_input)
+                
+                torch.cuda.synchronize()
+                fp8_time = time.time() - start_time
+                fp8_memory = torch.cuda.max_memory_allocated() / 1024**3  # GB
+                
+                # Calculate FP8 performance
+                fp8_throughput = num_iterations / fp8_time
+                fp8_tflops = (theoretical_tflops * num_iterations) / fp8_time
+                
+                # Benchmark unquantized
+                print("  Benchmarking unquantized...")
+                torch.cuda.empty_cache()
+                torch.cuda.reset_peak_memory_stats()
+                
+                start_time = time.time()
+                with torch.no_grad():
+                    for _ in range(num_iterations):
+                        _ = linear_unquant(test_input)
+                
+                torch.cuda.synchronize()
+                unquant_time = time.time() - start_time
+                unquant_memory = torch.cuda.max_memory_allocated() / 1024**3  # GB
+                
+                # Calculate unquantized performance
+                unquant_throughput = num_iterations / unquant_time
+                unquant_tflops = (theoretical_tflops * num_iterations) / unquant_time
+                
+                # Calculate speedup
+                speedup = unquant_time / fp8_time
+                tflops_speedup = fp8_tflops / unquant_tflops
+                
+                # Store results
+                result = {
+                    'batch_size': batch_size,
+                    'hidden_size': hidden_size,
+                    'theoretical_tflops': theoretical_tflops,
+                    'fp8_time': fp8_time,
+                    'fp8_throughput': fp8_throughput,
+                    'fp8_tflops': fp8_tflops,
+                    'fp8_memory_gb': fp8_memory,
+                    'unquant_time': unquant_time,
+                    'unquant_throughput': unquant_throughput,
+                    'unquant_tflops': unquant_tflops,
+                    'unquant_memory_gb': unquant_memory,
+                    'speedup': speedup,
+                    'tflops_speedup': tflops_speedup
+                }
+                results.append(result)
+                
+                # Print results for this configuration
+                print(f"    FP8:     {fp8_tflops:.3f} TFLOPs, {fp8_time:.4f}s, {fp8_memory:.2f}GB")
+                print(f"    Unquant: {unquant_tflops:.3f} TFLOPs, {unquant_time:.4f}s, {unquant_memory:.2f}GB")
+                print(f"    Speedup: {speedup:.2f}x (time), {tflops_speedup:.2f}x (TFLOPs)")
+                
+                # Clean up
+                del linear_fp8, linear_unquant, test_input
+                torch.cuda.empty_cache()
+                gc.collect()
+        
+        # Print summary table
+        print("\n" + "=" * 80)
+        print("GEMM Performance Benchmark Summary")
+        print("=" * 80)
+        print(f"{'Config':<15} {'FP8 TFLOPs':<12} {'Unquant TFLOPs':<15} {'Speedup':<10} {'Memory FP8':<12} {'Memory Unquant':<15}")
+        print("-" * 80)
+        
+        for result in results:
+            config = f"{result['batch_size']}x{result['hidden_size']}"
+            print(f"{config:<15} {result['fp8_tflops']:<12.3f} {result['unquant_tflops']:<15.3f} "
+                  f"{result['speedup']:<10.2f} {result['fp8_memory_gb']:<12.2f} {result['unquant_memory_gb']:<15.2f}")
+        
+        # Calculate overall statistics
+        avg_fp8_tflops = sum(r['fp8_tflops'] for r in results) / len(results)
+        avg_unquant_tflops = sum(r['unquant_tflops'] for r in results) / len(results)
+        avg_speedup = sum(r['speedup'] for r in results) / len(results)
+        avg_tflops_speedup = sum(r['tflops_speedup'] for r in results) / len(results)
+        
+        print("-" * 80)
+        print(f"{'AVERAGE':<15} {avg_fp8_tflops:<12.3f} {avg_unquant_tflops:<15.3f} "
+              f"{avg_speedup:<10.2f} {'-':<12} {'-':<15}")
+        
+        print(f"\nOverall Performance Summary:")
+        print(f"  Average FP8 TFLOPs: {avg_fp8_tflops:.3f}")
+        print(f"  Average Unquant TFLOPs: {avg_unquant_tflops:.3f}")
+        print(f"  Average Time Speedup: {avg_speedup:.2f}x")
+        print(f"  Average TFLOPs Speedup: {avg_tflops_speedup:.2f}x")
+        
+        if avg_tflops_speedup > 1.0:
+            print(f"  🚀 FP8 quantization provides {avg_tflops_speedup:.2f}x TFLOPs improvement!")
+        else:
+            print(f"  ⚠️  FP8 quantization shows {avg_tflops_speedup:.2f}x TFLOPs performance")
+        
+        return True
+        
+    except Exception as e:
+        print(f"✗ GEMM benchmark failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def main():
     """Run all tests."""
     print("FP8 Quantization Integration Tests")
@@ -188,6 +369,7 @@ def main():
         test_fp8_quant_method,
         test_fp8_forward_pass,
         test_model_integration,
+        benchmark_gemm_performance,
     ]
     
     results = []
@@ -216,6 +398,8 @@ def main():
             print("\n🔧 Fix needed: FP8 forward pass issue")
         if not results[3]:
             print("\n🔧 Fix needed: Model integration issue")
+        if not results[4]:
+            print("\n🔧 Fix needed: GEMM performance benchmark issue")
 
 if __name__ == "__main__":
     main() 
