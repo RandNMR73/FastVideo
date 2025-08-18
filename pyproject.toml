@@ -49,9 +49,9 @@ dependencies = [
     "av",
 
     # Preprocessing Dependencies
-    "torchcodec"
+    "torchcodec",
 
-    triton=3.4.0
+    triton==3.4.0,
 ]
 
 [tool.uv]
