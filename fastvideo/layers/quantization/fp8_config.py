@@ -61,7 +61,7 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         """Apply FP8 quantized computation."""
         if not hasattr(layer, '_fp8_weight') or layer._fp8_weight is None:
             start_time = time.time()
-            self.weight_fp8, self.weight_scale = per_block_cast_to_fp8_triton(layer.weight)
+            self.weight_fp8, self.weight_scale = per_block_cast_to_fp8(layer.weight)
             torch.cuda.synchronize()
             end_time = time.time()
             print(f"Time taken to cast weight to FP8: {end_time - start_time} seconds")
@@ -73,7 +73,7 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         assert x.dtype == torch.bfloat16, f"only allow bf16 inputs to fp8 linear, got {x.dtype}"
         
         start_time = time.time()
-        x_fp8, x_scale = per_token_cast_to_fp8_triton(x.view(-1, x.shape[-1]))
+        x_fp8, x_scale = per_token_cast_to_fp8(x.view(-1, x.shape[-1]))
         torch.cuda.synchronize()
         end_time = time.time()
         print(f"Time taken to cast input to FP8: {end_time - start_time} seconds")
