@@ -7,6 +7,7 @@ import torch
 from fastvideo.layers.quantization.fp8_config import FP8Config, FP8QuantizeMethod
 from fastvideo.layers.linear import ReplicatedLinear
 from fastvideo.layers.quantization import get_quantization_config
+import time
 
 def test_fp8_registration():
     """Test that FP8 config is properly registered."""
@@ -123,8 +124,16 @@ def test_fp8_forward_pass():
         # Test forward pass
         try:
             with torch.no_grad():
+                start_time = time.time()
                 output = linear_layer(test_input)
+                torch.cuda.synchronize()
+                end_time = time.time()
+                print(f"Time taken to perform FP8 GEMM: {end_time - start_time} seconds")
+                start_time = time.time()
                 output_unquant = linear_unquant(test_input)
+                torch.cuda.synchronize()
+                end_time = time.time()
+                print(f"Time taken to perform unquant GEMM: {end_time - start_time} seconds")
                 print(f"✓ Forward pass successful: {output[0].shape}")
                 print(f"✓ Forward pass successful: {output_unquant[0].shape}")
                 print(f"✓ Output {output[0]}")
