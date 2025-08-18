@@ -2,7 +2,7 @@ from typing import Literal, get_args
 
 from fastvideo.layers.quantization.base_config import QuantizationConfig
 
-QuantizationMethods = Literal[None, "fp8"]
+QuantizationMethods = Literal[None, "fp8", "mxfp4"]
 
 QUANTIZATION_METHODS: list[str] = list(get_args(QuantizationMethods))
 
@@ -57,6 +57,9 @@ def get_quantization_config(quantization: str) -> type[QuantizationConfig]:
     if quantization == "fp8":
         from fastvideo.layers.quantization.fp8_config import FP8Config
         method_to_config["fp8"] = FP8Config
+    elif quantization == "mxfp4":
+        from fastvideo.layers.quantization.mxfp4_config import MXFP4Config
+        method_to_config["mxfp4"] = MXFP4Config
 
     return method_to_config[quantization]
 
