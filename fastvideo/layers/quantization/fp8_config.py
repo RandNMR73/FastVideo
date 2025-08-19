@@ -138,22 +138,17 @@ class FP8Config(QuantizationConfig):
 
 @torch.compile
 def convert_model_to_fp8(model: torch.nn.Module):
-    try:
-        from torch.distributed.tensor import DTensor  # type: ignore
-    except Exception:
-        DTensor = None  # type: ignore
+    from torch.distributed.tensor import DTensor  # type: ignore
     for mod in model.modules():
         qm = getattr(mod, "quant_method", None)
         if isinstance(qm, FP8QuantizeMethod):
             weight = getattr(mod, "weight", None)
             if weight is None:
                 continue
-            # If weight is a DTensor, convert to local shard before casting
-            if DTensor is not None and isinstance(weight, DTensor):  # type: ignore
+            if isinstance(weight, DTensor):  # type: ignore
                 weight_local = weight.to_local()
             else:
                 weight_local = weight
             fp8_w, fp8_s = per_block_cast_to_fp8(weight_local)
-            # register so they move with the model
             mod.register_buffer("_fp8_weight", fp8_w, persistent=False)
             mod.register_buffer("_fp8_weight_scale", fp8_s, persistent=False)
