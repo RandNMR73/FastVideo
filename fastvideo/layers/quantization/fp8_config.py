@@ -76,13 +76,7 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         # end_time = time.time()
         # print(f"Time taken to cast input to FP8: {end_time - start_time} seconds")
         # print(f"x_scale.dtype: {x_scale.dtype}")
-        
-        # Ensure tensors are contiguous and properly aligned
-        # x_fp8 = x_fp8.contiguous()
-        # x_scale = x_scale.contiguous()
         x_scale = get_mn_major_tma_aligned_tensor(x_scale)
-        
-        # Ensure weight tensors are contiguous
         weight_fp8 = layer._fp8_weight
         weight_scale = layer._fp8_weight_scale
         
@@ -90,23 +84,14 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         out = torch.zeros((x_fp8.shape[0], out_dim), device=x.device, dtype=x.dtype)
         # start_time = time.time()
         
-        try:
-            deep_gemm.fp8_gemm_nt(
-                (x_fp8, x_scale),
-                (weight_fp8, weight_scale),
-                out,
-                # disable_ue8m0_cast=False  # TODO: need to set flag based on sm90/sm100
-            )   
-        except Exception as e:
-            print(f"FP8 GEMM failed: {e}")
-            print(f"Input FP8 shape: {x_fp8.shape}, device: {x_fp8.device}, contiguous: {x_fp8.is_contiguous()}")
-            print(f"Input scale shape: {x_scale.shape}, device: {x_scale.device}, contiguous: {x_scale.is_contiguous()}")
-            print(f"Weight FP8 shape: {weight_fp8.shape}, device: {weight_fp8.device}, contiguous: {weight_fp8.is_contiguous()}")
-            print(f"Weight scale shape: {weight_scale.shape}, device: {weight_scale.device}, contiguous: {weight_scale.is_contiguous()}")
-            print(f"Output shape: {out.shape}, device: {out.device}")
-            raise
+        deep_gemm.fp8_gemm_nt(
+            (x_fp8, x_scale),
+            (weight_fp8, weight_scale),
+            out,
+            # disable_ue8m0_cast=False  # TODO: need to set flag based on sm90/sm100
+        )   
             
-        torch.cuda.synchronize()
+        # torch.cuda.synchronize()
         # end_time = time.time()
         # print(f"Time taken to perform FP8 GEMM: {end_time - start_time} seconds")
         
@@ -151,6 +136,7 @@ class FP8Config(QuantizationConfig):
             return FP8QuantizeMethod()
         return None
 
+@torch.compile
 def convert_model_to_fp8(model: torch.nn.Module):
     try:
         from torch.distributed.tensor import DTensor  # type: ignore
