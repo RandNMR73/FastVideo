@@ -33,6 +33,7 @@ class MLP(nn.Module):
             quant_config=quant_config,
             prefix=f"{prefix}.fc_in",
         )
+        self.fc_in.quant_config.process_weights_after_loading(self.fc_in)
 
         self.act = get_act_fn(act_type)
         if output_dim is None:
@@ -43,7 +44,8 @@ class MLP(nn.Module):
                                        params_dtype=dtype,
                                        quant_config=quant_config,
                                        prefix=f"{prefix}.fc_out")
-
+        self.fc_out.quant_config.process_weights_after_loading(self.fc_out)
+        
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x, _ = self.fc_in(x)
         x = self.act(x)

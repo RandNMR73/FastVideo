@@ -33,18 +33,6 @@ from fastvideo.layers.quantization import QuantizationConfig
 logger = init_logger(__name__)
 
 
-def _convert_layer_to_fp8(layer: ReplicatedLinear, quant_config: QuantizationConfig | None, prefix: str) -> None:
-    """Helper function to safely convert a layer's weights to FP8."""
-    if quant_config is not None and hasattr(layer, 'quant_method'):
-        try:
-            quant_method = layer.quant_method
-            if hasattr(quant_method, 'process_weights_after_loading'):
-                quant_method.process_weights_after_loading(layer)
-        except Exception as e:
-            logger.warning(f"Failed to convert weights to FP8 for {prefix}: {e}")
-            # Continue without FP8 quantization for this layer
-
-
 class WanImageEmbedding(torch.nn.Module):
 
     def __init__(self, in_features: int, out_features: int):
@@ -130,13 +118,13 @@ class WanSelfAttention(nn.Module):
 
         # layers
         self.to_q = ReplicatedLinear(dim, dim, quant_config=quant_config, prefix=f"{prefix}.to_q")
-        _convert_layer_to_fp8(self.to_q, quant_config, f"{prefix}.to_q")
+        self.to_q.quant_config.process_weights_after_loading(self.to_q)
         self.to_k = ReplicatedLinear(dim, dim, quant_config=quant_config, prefix=f"{prefix}.to_k")
-        _convert_layer_to_fp8(self.to_k, quant_config, f"{prefix}.to_k")
+        self.to_k.quant_config.process_weights_after_loading(self.to_k)
         self.to_v = ReplicatedLinear(dim, dim, quant_config=quant_config, prefix=f"{prefix}.to_v")
-        _convert_layer_to_fp8(self.to_v, quant_config, f"{prefix}.to_v")
+        self.to_v.quant_config.process_weights_after_loading(self.to_v)
         self.to_out = ReplicatedLinear(dim, dim, quant_config=quant_config, prefix=f"{prefix}.to_out")
-        _convert_layer_to_fp8(self.to_out, quant_config, f"{prefix}.to_out")
+        self.to_out.quant_config.process_weights_after_loading(self.to_out)
         self.norm_q = RMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
         self.norm_k = RMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
 
@@ -205,9 +193,9 @@ class WanI2VCrossAttention(WanSelfAttention):
                          supported_attention_backends, quant_config=quant_config, prefix=prefix)
 
         self.add_k_proj = ReplicatedLinear(dim, dim, quant_config=quant_config, prefix=f"{prefix}.add_k_proj")
-        _convert_layer_to_fp8(self.add_k_proj, quant_config, f"{prefix}.add_k_proj")
+        self.add_k_proj.quant_config.process_weights_after_loading(self.add_k_proj)
         self.add_v_proj = ReplicatedLinear(dim, dim, quant_config=quant_config, prefix=f"{prefix}.add_v_proj")
-        _convert_layer_to_fp8(self.add_v_proj, quant_config, f"{prefix}.add_v_proj")
+        self.add_v_proj.quant_config.process_weights_after_loading(self.add_v_proj)
         self.norm_added_k = RMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
         self.norm_added_q = RMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
 
@@ -260,13 +248,14 @@ class WanTransformerBlock(nn.Module):
         # 1. Self-attention
         self.norm1 = FP32LayerNorm(dim, eps, elementwise_affine=False)
         self.to_q = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_q")
-        _convert_layer_to_fp8(self.to_q, quant_config, f"{prefix}.to_q")
+        self.to_q.quant_config.process_weights_after_loading(self.to_q)
         self.to_k = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_k")
-        _convert_layer_to_fp8(self.to_k, quant_config, f"{prefix}.to_k")
+        self.to_k.quant_config.process_weights_after_loading(self.to_k)
         self.to_v = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_v")
-        _convert_layer_to_fp8(self.to_v, quant_config, f"{prefix}.to_v")
+        self.to_v.quant_config.process_weights_after_loading(self.to_v)
+
         self.to_out = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_out")
-        _convert_layer_to_fp8(self.to_out, quant_config, f"{prefix}.to_out")
+        self.to_out.quant_config.process_weights_after_loading(self.to_out)
         self.attn1 = DistributedAttention(
             num_heads=num_heads,
             head_size=dim // num_heads,
@@ -412,15 +401,15 @@ class WanTransformerBlock_VSA(nn.Module):
         # 1. Self-attention
         self.norm1 = FP32LayerNorm(dim, eps, elementwise_affine=False)
         self.to_q = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_q")
-        _convert_layer_to_fp8(self.to_q, quant_config, f"{prefix}.to_q")
+        self.to_q.quant_config.process_weights_after_loading(self.to_q)
         self.to_k = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_k")
-        _convert_layer_to_fp8(self.to_k, quant_config, f"{prefix}.to_k")
+        self.to_k.quant_config.process_weights_after_loading(self.to_k)
         self.to_v = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_v")
-        _convert_layer_to_fp8(self.to_v, quant_config, f"{prefix}.to_v")
+        self.to_v.quant_config.process_weights_after_loading(self.to_v)
         self.to_gate_compress = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_gate_compress")
-        _convert_layer_to_fp8(self.to_gate_compress, quant_config, f"{prefix}.to_gate_compress")
+        self.to_gate_compress.quant_config.process_weights_after_loading(self.to_gate_compress)
         self.to_out = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_out")
-        _convert_layer_to_fp8(self.to_out, quant_config, f"{prefix}.to_out")
+        self.to_out.quant_config.process_weights_after_loading(self.to_out)
         self.attn1 = DistributedAttention_VSA(
             num_heads=num_heads,
             head_size=dim // num_heads,
