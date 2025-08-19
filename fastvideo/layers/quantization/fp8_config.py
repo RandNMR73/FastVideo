@@ -63,7 +63,7 @@ class FP8QuantizeMethod(QuantizeMethodBase):
             layer._fp8_weight_scale = self.weight_scale
             print(f"✓ Weights converted to FP8: {self.weight_fp8.shape}, scale: {self.weight_scale.shape}")
 
-    @torch.compile
+    # @torch.compile
     def apply(self, layer: torch.nn.Module, x: torch.Tensor, bias: torch.Tensor | None = None) -> torch.Tensor:
         """Apply FP8 quantized computation."""
         # if not hasattr(layer, '_fp8_weight') or layer._fp8_weight is None:
