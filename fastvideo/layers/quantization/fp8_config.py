@@ -54,16 +54,7 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         layer.register_parameter("weight", weight)
         set_weight_attrs(weight, extra_weight_attrs)
 
-    def process_weights_after_loading(self, layer: torch.nn.Module):
-        """Cast weights to FP8 offline after loading. This is called once during initialization."""
-        if not hasattr(layer, '_fp8_weight') or layer._fp8_weight is None:
-            print(f"Converting weights to FP8 for layer {type(layer).__name__}...")
-            self.weight_fp8, self.weight_scale = per_block_cast_to_fp8(layer.weight)
-            layer._fp8_weight = self.weight_fp8
-            layer._fp8_weight_scale = self.weight_scale
-            print(f"✓ Weights converted to FP8: {self.weight_fp8.shape}, scale: {self.weight_scale.shape}")
-
-    # @torch.compile
+    @torch.compile
     def apply(self, layer: torch.nn.Module, x: torch.Tensor, bias: torch.Tensor | None = None) -> torch.Tensor:
         """Apply FP8 quantized computation."""
         # if not hasattr(layer, '_fp8_weight') or layer._fp8_weight is None:
@@ -81,7 +72,7 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         
         # start_time = time.time()
         x_fp8, x_scale = per_token_cast_to_fp8(x.view(-1, x.shape[-1]))
-        torch.cuda.synchronize()
+        # torch.cuda.synchronize()
         # end_time = time.time()
         # print(f"Time taken to cast input to FP8: {end_time - start_time} seconds")
         # print(f"x_scale.dtype: {x_scale.dtype}")
@@ -92,8 +83,8 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         x_scale = get_mn_major_tma_aligned_tensor(x_scale)
         
         # Ensure weight tensors are contiguous
-        weight_fp8 = layer._fp8_weight.contiguous()
-        weight_scale = layer._fp8_weight_scale.contiguous()
+        weight_fp8 = layer._fp8_weight
+        weight_scale = layer._fp8_weight_scale
         
         original_shape = x.shape
         out = torch.zeros((x_fp8.shape[0], out_dim), device=x.device, dtype=x.dtype)
@@ -159,3 +150,12 @@ class FP8Config(QuantizationConfig):
         if isinstance(layer, LinearBase):
             return FP8QuantizeMethod()
         return None
+
+def convert_model_to_fp8(model: torch.nn.Module):
+    for mod in model.modules():
+        qm = getattr(mod, "quant_method", None)
+        if isinstance(qm, FP8QuantizeMethod):
+            fp8_w, fp8_s = per_block_cast_to_fp8(mod.weight)
+            # register so they move with the model
+            mod.register_buffer("_fp8_weight", fp8_w, persistent=False)
+            mod.register_buffer("_fp8_weight_scale", fp8_s, persistent=False)

@@ -22,6 +22,7 @@ from fastvideo.models.loader.utils import (get_param_names_mapping,
                                            hf_to_custom_state_dict)
 from fastvideo.models.loader.weight_utils import safetensors_weights_iterator
 from fastvideo.utils import set_mixed_precision_policy
+from fastvideo.layers.quantization.fp8_config import convert_model_to_fp8
 
 logger = init_logger(__name__)
 
@@ -137,6 +138,7 @@ def maybe_load_fsdp_model(
         # Avoid unintended computation graph accumulation during inference
         if isinstance(p, torch.nn.Parameter):
             p.requires_grad = False
+    convert_model_to_fp8(model)
     return model
 
 

@@ -118,17 +118,9 @@ class WanSelfAttention(nn.Module):
 
         # layers
         self.to_q = ReplicatedLinear(dim, dim, quant_config=quant_config, prefix=f"{prefix}.to_q")
-        if quant_config is not None:
-            self.to_q.quant_config.get_quant_method(self.to_q, f"{prefix}.to_q").process_weights_after_loading(self.to_q)
         self.to_k = ReplicatedLinear(dim, dim, quant_config=quant_config, prefix=f"{prefix}.to_k")
-        if quant_config is not None:
-            self.to_k.quant_config.get_quant_method(self.to_k, f"{prefix}.to_k").process_weights_after_loading(self.to_k)
         self.to_v = ReplicatedLinear(dim, dim, quant_config=quant_config, prefix=f"{prefix}.to_v")
-        if quant_config is not None:
-            self.to_v.quant_config.get_quant_method(self.to_v, f"{prefix}.to_v").process_weights_after_loading(self.to_v)
         self.to_out = ReplicatedLinear(dim, dim, quant_config=quant_config, prefix=f"{prefix}.to_out")
-        if quant_config is not None:
-            self.to_out.quant_config.get_quant_method(self.to_out, f"{prefix}.to_out").process_weights_after_loading(self.to_out)
         self.norm_q = RMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
         self.norm_k = RMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
 
@@ -197,11 +189,7 @@ class WanI2VCrossAttention(WanSelfAttention):
                          supported_attention_backends, quant_config=quant_config, prefix=prefix)
 
         self.add_k_proj = ReplicatedLinear(dim, dim, quant_config=quant_config, prefix=f"{prefix}.add_k_proj")
-        if quant_config is not None:
-            self.add_k_proj.quant_config.get_quant_method(self.add_k_proj, f"{prefix}.add_k_proj").process_weights_after_loading(self.add_k_proj)
         self.add_v_proj = ReplicatedLinear(dim, dim, quant_config=quant_config, prefix=f"{prefix}.add_v_proj")
-        if quant_config is not None:
-            self.add_v_proj.quant_config.get_quant_method(self.add_v_proj, f"{prefix}.add_v_proj").process_weights_after_loading(self.add_v_proj)
         self.norm_added_k = RMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
         self.norm_added_q = RMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
 
@@ -254,17 +242,10 @@ class WanTransformerBlock(nn.Module):
         # 1. Self-attention
         self.norm1 = FP32LayerNorm(dim, eps, elementwise_affine=False)
         self.to_q = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_q")
-        if quant_config is not None:
-            self.to_q.quant_config.get_quant_method(self.to_q, f"{prefix}.to_q").process_weights_after_loading(self.to_q)
         self.to_k = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_k")
-        if quant_config is not None:
-            self.to_k.quant_config.get_quant_method(self.to_k, f"{prefix}.to_k").process_weights_after_loading(self.to_k)
         self.to_v = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_v")
-        if quant_config is not None:
-            self.to_v.quant_config.get_quant_method(self.to_v, f"{prefix}.to_v").process_weights_after_loading(self.to_v)
+
         self.to_out = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_out")
-        if quant_config is not None:
-            self.to_out.quant_config.get_quant_method(self.to_out, f"{prefix}.to_out").process_weights_after_loading(self.to_out)
         self.attn1 = DistributedAttention(
             num_heads=num_heads,
             head_size=dim // num_heads,
@@ -410,20 +391,10 @@ class WanTransformerBlock_VSA(nn.Module):
         # 1. Self-attention
         self.norm1 = FP32LayerNorm(dim, eps, elementwise_affine=False)
         self.to_q = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_q")
-        if quant_config is not None:
-            self.to_q.quant_config.get_quant_method(self.to_q, f"{prefix}.to_q").process_weights_after_loading(self.to_q)
         self.to_k = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_k")
-        if quant_config is not None:
-            self.to_k.quant_config.get_quant_method(self.to_k, f"{prefix}.to_k").process_weights_after_loading(self.to_k)
         self.to_v = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_v")
-        if quant_config is not None:
-            self.to_v.quant_config.get_quant_method(self.to_v, f"{prefix}.to_v").process_weights_after_loading(self.to_v)
         self.to_gate_compress = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_gate_compress")
-        if quant_config is not None:
-            self.to_gate_compress.quant_config.get_quant_method(self.to_gate_compress, f"{prefix}.to_gate_compress").process_weights_after_loading(self.to_gate_compress)
         self.to_out = ReplicatedLinear(dim, dim, bias=True, quant_config=quant_config, prefix=f"{prefix}.to_out")
-        if quant_config is not None:
-            self.to_out.quant_config.get_quant_method(self.to_out, f"{prefix}.to_out").process_weights_after_loading(self.to_out)
         self.attn1 = DistributedAttention_VSA(
             num_heads=num_heads,
             head_size=dim // num_heads,
