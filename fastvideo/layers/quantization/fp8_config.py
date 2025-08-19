@@ -92,8 +92,8 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         x_scale = get_mn_major_tma_aligned_tensor(x_scale)
         
         # Ensure weight tensors are contiguous
-        # weight_fp8 = layer._fp8_weight.contiguous()
-        # weight_scale = layer._fp8_weight_scale.contiguous()
+        weight_fp8 = layer._fp8_weight
+        weight_scale = layer._fp8_weight_scale
         
         original_shape = x.shape
         out = torch.zeros((x_fp8.shape[0], out_dim), device=x.device, dtype=x.dtype)
