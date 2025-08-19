@@ -54,17 +54,26 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         layer.register_parameter("weight", weight)
         set_weight_attrs(weight, extra_weight_attrs)
 
+    def process_weights_after_loading(self, layer: torch.nn.Module):
+        """Cast weights to FP8 offline after loading. This is called once during initialization."""
+        if not hasattr(layer, '_fp8_weight') or layer._fp8_weight is None:
+            print(f"Converting weights to FP8 for layer {type(layer).__name__}...")
+            self.weight_fp8, self.weight_scale = per_block_cast_to_fp8(layer.weight)
+            layer._fp8_weight = self.weight_fp8
+            layer._fp8_weight_scale = self.weight_scale
+            print(f"✓ Weights converted to FP8: {self.weight_fp8.shape}, scale: {self.weight_scale.shape}")
+
     @torch.compile
     def apply(self, layer: torch.nn.Module, x: torch.Tensor, bias: torch.Tensor | None = None) -> torch.Tensor:
         """Apply FP8 quantized computation."""
-        if not hasattr(layer, '_fp8_weight') or layer._fp8_weight is None:
-            # start_time = time.time()
-            self.weight_fp8, self.weight_scale = per_block_cast_to_fp8(layer.weight)
-            torch.cuda.synchronize()
-            # end_time = time.time()
-            # print(f"Time taken to cast weight to FP8: {end_time - start_time} seconds")
-            layer._fp8_weight = self.weight_fp8
-            layer._fp8_weight_scale = self.weight_scale
+        # if not hasattr(layer, '_fp8_weight') or layer._fp8_weight is None:
+        #     # start_time = time.time()
+        #     self.weight_fp8, self.weight_scale = per_block_cast_to_fp8(layer.weight)
+        #     torch.cuda.synchronize()
+        #     # end_time = time.time()
+        #     # print(f"Time taken to cast weight to FP8: {end_time - start_time} seconds")
+        #     layer._fp8_weight = self.weight_fp8
+        #     layer._fp8_weight_scale = self.weight_scale
         
         out_dim = layer.weight.shape[0]
         # Need contiguous tensors for collectives.
