@@ -37,7 +37,7 @@ def main():
     model_id = "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"
     pipeline_config = PipelineConfig.from_pretrained(model_id)
     pipeline_config.dit_precision = "bf16"  # required for FP8
-    pipeline_config.dit_config.quant_config = FP8Config()
+    # pipeline_config.dit_config.quant_config = FP8Config()
     
     # Create VideoGenerator with FP8-compatible settings
     print("\nLoading model with FP8 quantization...")
