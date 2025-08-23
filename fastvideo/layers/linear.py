@@ -234,7 +234,7 @@ class ReplicatedLinear(LinearBase):
         bias = self.bias if not self.skip_bias_add else None
         assert self.quant_method is not None
         output = self.quant_method.apply(self, x, bias)
-        print(f"input shape: {x.shape} --> output shape: {output.shape}")
+        print(f"Layer: {self.prefix} | input shape: {x.shape} --> output shape: {output.shape}")
         output_bias = self.bias if self.skip_bias_add else None
         return output, output_bias
 
