@@ -197,7 +197,10 @@ class ReplicatedLinear(LinearBase):
                          prefix=prefix)
 
         # All the linear layer supports quant method.
-        assert self.quant_method is not None
+        if self.quant_method is None:
+            # If no quantization method is provided, use unquantized method
+            self.quant_method = UnquantizedLinearMethod()
+        
         self.quant_method.create_weights(self,
                                          self.input_size, [self.output_size],
                                          self.input_size,
@@ -232,7 +235,9 @@ class ReplicatedLinear(LinearBase):
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, Parameter | None]:
         bias = self.bias if not self.skip_bias_add else None
-        assert self.quant_method is not None
+        if self.quant_method is None:
+            # If no quantization method is provided, use unquantized method
+            self.quant_method = UnquantizedLinearMethod()
         output = self.quant_method.apply(self, x, bias)
         print(f"Layer: {self.prefix} | input shape: {x.shape} --> output shape: {output.shape}")
         output_bias = self.bias if self.skip_bias_add else None
@@ -299,7 +304,10 @@ class ColumnParallelLinear(LinearBase):
         if output_sizes is None:
             output_sizes = [output_size]
 
-        assert self.quant_method is not None
+        if self.quant_method is None:
+            # If no quantization method is provided, use unquantized method
+            self.quant_method = UnquantizedLinearMethod()
+        
         self.quant_method.create_weights(
             layer=self,
             input_size_per_partition=self.input_size_per_partition,
@@ -360,7 +368,9 @@ class ColumnParallelLinear(LinearBase):
         bias = self.bias if not self.skip_bias_add else None
 
         # Matrix multiply.
-        assert self.quant_method is not None
+        if self.quant_method is None:
+            # If no quantization method is provided, use unquantized method
+            self.quant_method = UnquantizedLinearMethod()
         output_parallel = self.quant_method.apply(self, input_, bias)
         if self.gather_output:
             # All-gather across the partitions.
@@ -867,7 +877,10 @@ class RowParallelLinear(LinearBase):
         self.input_is_parallel = input_is_parallel
         self.reduce_results = reduce_results
 
-        assert self.quant_method is not None
+        if self.quant_method is None:
+            # If no quantization method is provided, use unquantized method
+            self.quant_method = UnquantizedLinearMethod()
+        
         self.quant_method.create_weights(
             layer=self,
             input_size_per_partition=self.input_size_per_partition,
@@ -936,7 +949,9 @@ class RowParallelLinear(LinearBase):
             input_parallel = splitted_input[tp_rank].contiguous()
 
         # Matrix multiply.
-        assert self.quant_method is not None
+        if self.quant_method is None:
+            # If no quantization method is provided, use unquantized method
+            self.quant_method = UnquantizedLinearMethod()
         # Only fuse bias add into GEMM for rank 0 (this ensures that
         # bias will not get added more than once in TP>1 case)
         bias_ = None if (self.tp_rank > 0 or self.skip_bias_add) else self.bias
