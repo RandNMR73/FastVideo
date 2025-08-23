@@ -130,9 +130,9 @@ class FP8Config(QuantizationConfig):
         return cls()
     
     def get_quant_method(self, layer: torch.nn.Module, prefix: str):
-        # Apply FP8 quantization to all linear layers
+        # Apply FP8 quantization only to linear layers with "ffn.fc_in" in their prefix
         from fastvideo.layers.linear import LinearBase
-        if isinstance(layer, LinearBase):
+        if isinstance(layer, LinearBase) and "ffn.fc_in" in prefix:
             return FP8QuantizeMethod()
         return None
 
