@@ -239,7 +239,7 @@ class ReplicatedLinear(LinearBase):
             # If no quantization method is provided, use unquantized method
             self.quant_method = UnquantizedLinearMethod()
         output = self.quant_method.apply(self, x, bias)
-        # print(f"Layer: {self.prefix} | input shape: {x.shape} --> output shape: {output.shape}")
+        print(f"Layer: {self.prefix} | input shape: {x.shape} --> output shape: {output.shape}, Quant Method: {self.quant_method.__class__.__name__}")
         output_bias = self.bias if self.skip_bias_add else None
         return output, output_bias
 
