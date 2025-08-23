@@ -34,7 +34,9 @@ class MLP(nn.Module):
             prefix=f"{prefix}.fc_in",
         )
         if quant_config is not None:
-            self.fc_in.quant_config.get_quant_method(self.fc_in, f"{prefix}.fc_in").process_weights_after_loading(self.fc_in)
+            quant_method = self.fc_in.quant_config.get_quant_method(self.fc_in, f"{prefix}.fc_in")
+            if quant_method is not None:
+                quant_method.process_weights_after_loading(self.fc_in)
 
         self.act = get_act_fn(act_type)
         if output_dim is None:
@@ -46,7 +48,9 @@ class MLP(nn.Module):
                                        quant_config=quant_config,
                                        prefix=f"{prefix}.fc_out")
         if quant_config is not None:
-            self.fc_out.quant_config.get_quant_method(self.fc_out, f"{prefix}.fc_out").process_weights_after_loading(self.fc_out)
+            quant_method = self.fc_out.quant_config.get_quant_method(self.fc_out, f"{prefix}.fc_out")
+            if quant_method is not None:
+                quant_method.process_weights_after_loading(self.fc_out)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x, _ = self.fc_in(x)
