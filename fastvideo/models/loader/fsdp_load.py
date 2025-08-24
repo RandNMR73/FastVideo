@@ -23,7 +23,6 @@ from fastvideo.models.loader.utils import (get_param_names_mapping,
 from fastvideo.models.loader.weight_utils import safetensors_weights_iterator
 from fastvideo.utils import set_mixed_precision_policy
 from fastvideo.layers.quantization.fp8_config import convert_model_to_fp8
-from fastvideo.layers.quantization.mxfp4_config import convert_model_to_mxfp4
 
 logger = init_logger(__name__)
 
