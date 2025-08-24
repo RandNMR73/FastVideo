@@ -55,10 +55,14 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         assert x.dtype == torch.bfloat16, f"only allow bf16 inputs to mxfp4 linear, got {x.dtype}"
         
         weight, scale = quantize_mx4(layer.weight) 
+        original_shape = x.shape
         x = x.view(-1, x.shape[-1])
         
         pc = PrecisionConfig(weight_scale=scale, flex_ctx=FlexCtx(rhs_data=InFlexData()))
         out = matmul_ogs(x, weight, bias, precision_config=pc)
+
+        if len(original_shape) == 3:
+            out = out.view(original_shape[0], original_shape[1], out_dim)
         
         return out
         
