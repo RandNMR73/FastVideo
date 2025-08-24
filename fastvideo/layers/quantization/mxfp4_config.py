@@ -53,10 +53,10 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         # Need contiguous tensors for collectives.
         assert x.dtype == torch.bfloat16, f"only allow bf16 inputs to mxfp4 linear, got {x.dtype}"
         
-        layer._mxfp4_weight, layer._mxfp4_weight_scale = quantize_mx4(layer.weight)
+        weight, scale = quantize_mx4(layer.weight)
         
-        pc = PrecisionConfig(weight_scale=layer._mxfp4_weight_scale, flex_ctx=FlexCtx(rhs_data=InFlexData()))
-        out = matmul_ogs(x, layer._mxfp4_weight, bias, precision_config=pc)
+        pc = PrecisionConfig(weight_scale=scale, flex_ctx=FlexCtx(rhs_data=InFlexData()))
+        out = matmul_ogs(x, weight, bias, precision_config=pc)
         
         return out
         
@@ -103,35 +103,3 @@ class MXFP4Config(QuantizationConfig):
         
         return None
 
-# @torch.compile
-def convert_model_to_mxfp4(model: torch.nn.Module):
-    from torch.distributed.tensor import DTensor  # type: ignore
-    print("Starting convert_model_to_mxfp4...")
-    converted_count = 0
-    
-    for mod in model.modules():
-        qm = getattr(mod, "quant_method", None)
-        if isinstance(qm, MXFP4QuantizeMethod):
-            print(f"Converting module with quant_method: {type(qm).__name__}")
-            weight = getattr(mod, "weight", None)
-            if weight is None:
-                print("  -> No weight found, skipping")
-                continue
-            if isinstance(weight, DTensor):  # type: ignore
-                weight_local = weight.to_local()
-                print("  -> Converted DTensor to local")
-            else:
-                weight_local = weight
-                print(f"  -> Using local weight with shape: {weight_local.shape}")
-            
-            try:
-                mxfp4_w, mxfp4_s = quantize_mx4(weight_local)
-                mod.register_buffer("_mxfp4_weight", mxfp4_w, persistent=False)
-                mod.register_buffer("_mxfp4_weight_scale", mxfp4_s, persistent=False)
-                converted_count += 1
-                print(f"  -> Successfully converted and registered buffers")
-            except Exception as e:
-                print(f"  -> Error during conversion: {e}")
-                continue
-    
-    print(f"convert_model_to_mxfp4 completed. Converted {converted_count} modules.")

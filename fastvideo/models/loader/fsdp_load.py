@@ -140,7 +140,7 @@ def maybe_load_fsdp_model(
         if isinstance(p, torch.nn.Parameter):
             p.requires_grad = False
     # convert_model_to_fp8(model)
-    convert_model_to_mxfp4(model)
+    # convert_model_to_mxfp4(model)
     return model
 
 
