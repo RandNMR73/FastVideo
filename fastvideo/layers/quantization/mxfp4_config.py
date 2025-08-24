@@ -18,16 +18,11 @@ from triton_kernels.tensor_details.layout import StridedLayout, HopperMXValueLay
 from triton_kernels.tensor import wrap_torch_tensor, FP4
 
 def quantize_mx4(w):
-    # Use the downcast_to_mxfp function which should return PyTorch tensors
-    w_quantized, w_scale = downcast_to_mxfp(w.to(torch.bfloat16), torch.uint8, axis=1)
-    
-    # Ensure we have PyTorch tensors
-    if not isinstance(w_quantized, torch.Tensor):
-        w_quantized = torch.tensor(w_quantized, device=w.device, dtype=torch.uint8)
-    if not isinstance(w_scale, torch.Tensor):
-        w_scale = torch.tensor(w_scale, device=w.device, dtype=torch.float32)
-    
-    return w_quantized, w_scale
+    """Quantize weights to MXFP4 format."""
+    w, w_scale = downcast_to_mxfp(w.to(torch.bfloat16), torch.uint8, axis=1)
+    w = convert_layout(wrap_torch_tensor(w, dtype=FP4), HopperMXValueLayout, mx_axis=1)
+    w_scale = convert_layout(wrap_torch_tensor(w_scale), StridedLayout)
+    return w, w_scale
 
 class MXFP4QuantizeMethod(QuantizeMethodBase):
     def __init__(self):
@@ -58,26 +53,10 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         # Need contiguous tensors for collectives.
         assert x.dtype == torch.bfloat16, f"only allow bf16 inputs to mxfp4 linear, got {x.dtype}"
         
-        weight_mxfp4 = layer._mxfp4_weight
-        weight_scale = layer._mxfp4_weight_scale
+        layer._mxfp4_weight, layer._mxfp4_weight_scale = quantize_mx4(layer.weight)
         
-        # Convert the stored quantized weights to proper Triton layout for matmul_ogs
-        weight_mxfp4_triton = convert_layout(wrap_torch_tensor(weight_mxfp4, dtype=FP4), HopperMXValueLayout, mx_axis=1)
-        weight_scale_triton = convert_layout(wrap_torch_tensor(weight_scale), StridedLayout)
-        
-        original_shape = x.shape
-        x_reshaped = x.view(-1, x.shape[-1])
-        
-        pc = PrecisionConfig(weight_scale=weight_scale_triton, flex_ctx=FlexCtx(rhs_data=InFlexData()))
-        out = matmul_ogs(x_reshaped, weight_mxfp4_triton, bias, precision_config=pc)
-            
-        if bias is not None:
-            if bias.device != out.device or bias.dtype != out.dtype:
-                bias = bias.to(device=out.device, dtype=out.dtype)
-            out = out + bias
-        
-        if len(original_shape) == 3:
-            out = out.view(original_shape[0], original_shape[1], out_dim)
+        pc = PrecisionConfig(weight_scale=layer._mxfp4_weight_scale, flex_ctx=FlexCtx(rhs_data=InFlexData()))
+        out = matmul_ogs(x, layer._mxfp4_weight, bias, precision_config=pc)
         
         return out
         
