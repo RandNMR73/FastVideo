@@ -60,7 +60,6 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         layer.register_parameter("weight", weight)
         set_weight_attrs(weight, extra_weight_attrs)
 
-        print(f"weight shape: {weight.shape}")
 
     # @torch.compile
     def apply(self, layer: torch.nn.Module, x: torch.Tensor, bias: torch.Tensor | None = None) -> torch.Tensor:
@@ -69,7 +68,8 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         # Need contiguous tensors for collectives.
         assert x.dtype == torch.bfloat16, f"only allow bf16 inputs to mxfp4 linear, got {x.dtype}"
         
-        weight, scale = quantize_mx4(layer.weight)
+        weight, scale = quantize_mx4(layer.weight) 
+        x = x.view(-1, x.shape[-1])
         
         pc = PrecisionConfig(weight_scale=scale, flex_ctx=FlexCtx(rhs_data=InFlexData()))
         out = matmul_ogs(x, weight, bias, precision_config=pc)
