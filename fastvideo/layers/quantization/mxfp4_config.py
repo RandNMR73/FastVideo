@@ -76,7 +76,7 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
             print(f"Weight _data shape: {weight._data.shape}")
         
         # Let's try transposing the weight to see if that fixes the stride issue
-        weight_transposed = weight.trans()
+        weight_transposed = weight.T
         print(f"Transposed weight shape: {weight_transposed.shape}")
         print(f"Transposed weight stride: {weight_transposed.stride()}")
         
