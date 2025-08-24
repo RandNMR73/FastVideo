@@ -46,6 +46,16 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         layer.register_parameter("weight", weight)
         set_weight_attrs(weight, extra_weight_attrs)
 
+        # Override bias creation to ensure bfloat16 dtype for MXFP4 compatibility
+        if hasattr(layer, 'bias') and layer.bias is not None:
+            # Replace the existing bias with bfloat16 version
+            bias_data = layer.bias.data.clone()
+            layer.bias = Parameter(bias_data.to(torch.bfloat16), requires_grad=False)
+            set_weight_attrs(layer.bias, {
+                "output_dim": 0,
+                "weight_loader": getattr(layer, 'weight_loader', None),
+            })
+
 
     # @torch.compile
     def apply(self, layer: torch.nn.Module, x: torch.Tensor, bias: torch.Tensor | None = None) -> torch.Tensor:
@@ -60,6 +70,7 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         
         # Convert bias to bfloat16 if it exists and isn't already bfloat16
         if bias is not None and bias.dtype != torch.bfloat16:
+            print(f"WARNING: Converting bias from {bias.dtype} to bfloat16 for MXFP4 kernel")
             bias = bias.to(torch.bfloat16)
         
         pc = PrecisionConfig(weight_scale=scale, flex_ctx=FlexCtx(rhs_data=InFlexData()))
