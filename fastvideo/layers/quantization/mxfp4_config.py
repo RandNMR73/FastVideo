@@ -75,7 +75,24 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         
         # Don't pass bias to the kernel - handle it manually afterward to avoid type conflicts
         pc = PrecisionConfig(weight_scale=scale, flex_ctx=FlexCtx(rhs_data=InFlexData()))
-        out = matmul_ogs(x, weight, None, precision_config=pc)
+        
+        print(f"About to call matmul_ogs:")
+        print(f"  x.shape: {x.shape}, x.dtype: {x.dtype}")
+        print(f"  weight.shape: {weight.shape}, weight.dtype: {getattr(weight, 'dtype', 'unknown')}")
+        print(f"  weight type: {type(weight)}")
+        
+        try:
+            out = matmul_ogs(x, weight, None, precision_config=pc)
+        except AssertionError as e:
+            print(f"AssertionError in matmul_ogs: {e}")
+            print(f"This suggests K extracted from weight != x.shape[-1]")
+            print(f"x.shape[-1] = {x.shape[-1]}")
+            # Try to access weight tensor properties
+            if hasattr(weight, 'shape'):
+                print(f"weight.shape = {weight.shape}")
+            if hasattr(weight, 'stride'):
+                print(f"weight.stride() = {weight.stride()}")
+            raise
         
         # Add bias manually if it exists
         if bias is not None:
