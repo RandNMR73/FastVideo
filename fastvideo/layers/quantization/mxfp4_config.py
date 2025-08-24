@@ -93,12 +93,7 @@ class MXFP4Config(QuantizationConfig):
     def get_quant_method(self, layer: torch.nn.Module, prefix: str):
         # Apply MXFP4 quantization to all linear layers
         from fastvideo.layers.linear import LinearBase
-        # Only apply MXFP4 quantization to fully-connected layers where the weight
-        # matrix dimensions are guaranteed to be compatible with the MX layout.
-        # Using it for the per-projection QKV matrices (to_q / to_k / to_v / to_out)
-        # can result in shape mis-matches during the Triton kernel reshape step
-        # when the hidden dimension is not a multiple of the expected tile size.
-        mxfp4_layers = ["fc_in", "fc_out"]
+        mxfp4_layers = ["fc_in", "fc_out", "to_q", "to_k", "to_v", "to_out"]
         
         # Debug logging to see what prefixes we're getting
         if isinstance(layer, LinearBase):
