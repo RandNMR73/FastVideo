@@ -19,24 +19,10 @@ from triton_kernels.tensor import wrap_torch_tensor, FP4
 
 def quantize_mx4(w):
     """Quantize weights to MXFP4 format."""
-    try:
-        # Use the downcast_to_mxfp function which should return PyTorch tensors
-        w_quantized, w_scale = downcast_to_mxfp(w.to(torch.bfloat16), torch.uint8, axis=1)
-        
-        # Ensure we have PyTorch tensors
-        if not isinstance(w_quantized, torch.Tensor):
-            w_quantized = torch.tensor(w_quantized, device=w.device, dtype=torch.uint8)
-        if not isinstance(w_scale, torch.Tensor):
-            w_scale = torch.tensor(w_scale, device=w.device, dtype=torch.float32)
-        
-        return w_quantized, w_scale
-    except Exception as e:
-        print(f"Warning: downcast_to_mxfp failed: {e}")
-        print(f"Falling back to simple uint8 quantization")
-        # Simple fallback: just convert to uint8 with a basic scale
-        w_uint8 = (w.to(torch.float32) * 127.0).clamp(-127, 127).to(torch.int8).to(torch.uint8)
-        w_scale_simple = torch.ones(w.shape[0], device=w.device, dtype=torch.float32) * (1.0 / 127.0)
-        return w_uint8, w_scale_simple
+    w, w_scale = downcast_to_mxfp(w.to(torch.bfloat16), torch.uint8, axis=1)
+    w = convert_layout(wrap_torch_tensor(w, dtype=FP4), HopperMXValueLayout, mx_axis=1)
+    w_scale = convert_layout(wrap_torch_tensor(w_scale), StridedLayout)
+    return w, w_scale
 
 class MXFP4QuantizeMethod(QuantizeMethodBase):
     def __init__(self):
