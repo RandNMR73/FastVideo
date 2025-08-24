@@ -19,8 +19,8 @@ from triton_kernels.tensor import wrap_torch_tensor, FP4
 
 def quantize_mx4(w):
     """Quantize weights to MXFP4 format."""
-    w, w_scale = downcast_to_mxfp(w.to(torch.bfloat16), torch.uint8, axis=0)
-    w = convert_layout(wrap_torch_tensor(w, dtype=FP4), HopperMXValueLayout, mx_axis=0)
+    w, w_scale = downcast_to_mxfp(w.to(torch.bfloat16), torch.uint8, axis=1)
+    w = convert_layout(wrap_torch_tensor(w, dtype=FP4), HopperMXValueLayout, mx_axis=1)
     w_scale = convert_layout(wrap_torch_tensor(w_scale), StridedLayout)
     return w, w_scale
 
