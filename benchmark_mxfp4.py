@@ -13,7 +13,7 @@ import argparse
 import numpy as np
 
 # Import our MXFP4 quantization module
-from gpt_oss.triton.mxfp4_quantization import MXFP4Linear
+from mxfp4_quantization import MXFP4Linear
 
 
 def test_correctness(input_size: int, output_size: int, batch_size: int, 
