@@ -16,7 +16,7 @@ from fastvideo.layers.quantization.fp8_config import FP8Config
 from fastvideo.layers.linear import ReplicatedLinear
 
 OUTPUT_PATH = "fp8_video_samples"
-OUTPUT_PATH = "video_samples"
+# OUTPUT_PATH = "video_samples"
 
 def main():
     print("=== FP8 Quantization Video Generation Example ===")
