@@ -68,13 +68,15 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         original_shape = x.shape
         x = x.view(-1, x.shape[-1])
         
-        # Convert bias to bfloat16 if it exists and isn't already bfloat16
-        if bias is not None and bias.dtype != torch.bfloat16:
-            print(f"WARNING: Converting bias from {bias.dtype} to bfloat16 for MXFP4 kernel")
-            bias = bias.to(torch.bfloat16)
-        
+        # Don't pass bias to the kernel - handle it manually afterward to avoid type conflicts
         pc = PrecisionConfig(weight_scale=scale, flex_ctx=FlexCtx(rhs_data=InFlexData()))
-        out = matmul_ogs(x, weight, bias, precision_config=pc)
+        out = matmul_ogs(x, weight, None, precision_config=pc)
+        
+        # Add bias manually if it exists
+        if bias is not None:
+            if bias.dtype != out.dtype:
+                bias = bias.to(out.dtype)
+            out = out + bias
 
         if len(original_shape) == 3:
             out = out.view(original_shape[0], original_shape[1], out_dim)
