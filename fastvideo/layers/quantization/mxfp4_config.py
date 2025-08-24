@@ -19,8 +19,8 @@ from triton_kernels.tensor import wrap_torch_tensor, FP4
 
 def quantize_mx4(w):
     """Quantize weights to MXFP4 format."""
-    w, w_scale = downcast_to_mxfp(w.to(torch.bfloat16), torch.uint8, axis=1)
-    w = convert_layout(wrap_torch_tensor(w, dtype=FP4), HopperMXValueLayout, mx_axis=1)
+    w, w_scale = downcast_to_mxfp(w.to(torch.bfloat16), torch.uint8, axis=0)
+    w = convert_layout(wrap_torch_tensor(w, dtype=FP4), HopperMXValueLayout, mx_axis=0)
     w_scale = convert_layout(wrap_torch_tensor(w_scale), StridedLayout)
     return w, w_scale
 
@@ -64,9 +64,14 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         # Need contiguous tensors for collectives.
         assert x.dtype == torch.bfloat16, f"only allow bf16 inputs to mxfp4 linear, got {x.dtype}"
         
+        print(f"Layer weight shape: {layer.weight.shape}")
         weight, scale = quantize_mx4(layer.weight) 
+        print(f"Quantized weight shape: {weight.shape}")
+        print(f"Scale shape: {scale.shape}")
+        
         original_shape = x.shape
         x = x.view(-1, x.shape[-1])
+        print(f"Input shape after view: {x.shape}")
         
         # Don't pass bias to the kernel - handle it manually afterward to avoid type conflicts
         pc = PrecisionConfig(weight_scale=scale, flex_ctx=FlexCtx(rhs_data=InFlexData()))
