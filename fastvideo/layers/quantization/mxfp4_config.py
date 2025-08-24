@@ -26,6 +26,8 @@ def quantize_mx4(w):
 class MXFP4QuantizeMethod(QuantizeMethodBase):
     def __init__(self):
         super().__init__()
+        self.weight_mxfp4 = None
+        self.weight_scale = None
 
     def create_weights(self, layer: torch.nn.Module,
                        input_size_per_partition: int,
@@ -43,10 +45,30 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         layer.register_parameter("weight", weight)
         set_weight_attrs(weight, extra_weight_attrs)
 
+    # @torch.compile
     def apply(self, layer: torch.nn.Module, x: torch.Tensor, bias: torch.Tensor | None = None) -> torch.Tensor:
-        w, w_mx = quantize_mx4(layer.weight)
-        pc = PrecisionConfig(weight_scale=w_mx, flex_ctx=FlexCtx(rhs_data=InFlexData()))
-        out = matmul_ogs(x, w, bias, precision_config=pc)
+        """Apply MXFP4 quantized computation."""
+        out_dim = layer.weight.shape[0]
+        # Need contiguous tensors for collectives.
+        assert x.dtype == torch.bfloat16, f"only allow bf16 inputs to mxfp4 linear, got {x.dtype}"
+        
+        weight_mxfp4 = layer._mxfp4_weight
+        weight_scale = layer._mxfp4_weight_scale
+        
+        original_shape = x.shape
+        x_reshaped = x.view(-1, x.shape[-1])
+        
+        pc = PrecisionConfig(weight_scale=weight_scale, flex_ctx=FlexCtx(rhs_data=InFlexData()))
+        out = matmul_ogs(x_reshaped, weight_mxfp4, bias, precision_config=pc)
+            
+        if bias is not None:
+            if bias.device != out.device or bias.dtype != out.dtype:
+                bias = bias.to(device=out.device, dtype=out.dtype)
+            out = out + bias
+        
+        if len(original_shape) == 3:
+            out = out.view(original_shape[0], original_shape[1], out_dim)
+        
         return out
         
 
@@ -76,6 +98,24 @@ class MXFP4Config(QuantizationConfig):
     def get_quant_method(self, layer: torch.nn.Module, prefix: str):
         # Apply MXFP4 quantization to all linear layers
         from fastvideo.layers.linear import LinearBase
-        if isinstance(layer, LinearBase):
+        mxfp4_layers = ["ffn.fc_in", "ffn.fc_out", "to_q", "to_k", "to_v", "to_out"]
+        if isinstance(layer, LinearBase) and any(layer_name in prefix for layer_name in mxfp4_layers):
             return MXFP4QuantizeMethod()
         return None
+
+@torch.compile
+def convert_model_to_mxfp4(model: torch.nn.Module):
+    from torch.distributed.tensor import DTensor  # type: ignore
+    for mod in model.modules():
+        qm = getattr(mod, "quant_method", None)
+        if isinstance(qm, MXFP4QuantizeMethod):
+            weight = getattr(mod, "weight", None)
+            if weight is None:
+                continue
+            if isinstance(weight, DTensor):  # type: ignore
+                weight_local = weight.to_local()
+            else:
+                weight_local = weight
+            mxfp4_w, mxfp4_s = quantize_mx4(weight_local)
+            mod.register_buffer("_mxfp4_weight", mxfp4_w, persistent=False)
+            mod.register_buffer("_mxfp4_weight_scale", mxfp4_s, persistent=False)
