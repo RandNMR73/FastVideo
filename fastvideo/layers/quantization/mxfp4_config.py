@@ -69,6 +69,17 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         print(f"Quantized weight shape: {weight.shape}")
         print(f"Scale shape: {scale.shape}")
         
+        # Check if we need to transpose or adjust the weight for matmul_ogs
+        # The stride pattern suggests the tensor might need transposition
+        print(f"Weight stride: {weight.stride()}")
+        if hasattr(weight, '_data'):
+            print(f"Weight _data shape: {weight._data.shape}")
+        
+        # Let's try transposing the weight to see if that fixes the stride issue
+        weight_transposed = weight.trans()
+        print(f"Transposed weight shape: {weight_transposed.shape}")
+        print(f"Transposed weight stride: {weight_transposed.stride()}")
+        
         original_shape = x.shape
         x = x.view(-1, x.shape[-1])
         print(f"Input shape after view: {x.shape}")
@@ -78,20 +89,20 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         
         print(f"About to call matmul_ogs:")
         print(f"  x.shape: {x.shape}, x.dtype: {x.dtype}")
-        print(f"  weight.shape: {weight.shape}, weight.dtype: {getattr(weight, 'dtype', 'unknown')}")
-        print(f"  weight type: {type(weight)}")
+        print(f"  weight.shape: {weight_transposed.shape}, weight.dtype: {getattr(weight_transposed, 'dtype', 'unknown')}")
+        print(f"  weight type: {type(weight_transposed)}")
         
         try:
-            out = matmul_ogs(x, weight, None, precision_config=pc)
+            out = matmul_ogs(x, weight_transposed, None, precision_config=pc)
         except AssertionError as e:
             print(f"AssertionError in matmul_ogs: {e}")
             print(f"This suggests K extracted from weight != x.shape[-1]")
             print(f"x.shape[-1] = {x.shape[-1]}")
             # Try to access weight tensor properties
-            if hasattr(weight, 'shape'):
-                print(f"weight.shape = {weight.shape}")
-            if hasattr(weight, 'stride'):
-                print(f"weight.stride() = {weight.stride()}")
+            if hasattr(weight_transposed, 'shape'):
+                print(f"weight.shape = {weight_transposed.shape}")
+            if hasattr(weight_transposed, 'stride'):
+                print(f"weight.stride() = {weight_transposed.stride()}")
             raise
         
         # Add bias manually if it exists
