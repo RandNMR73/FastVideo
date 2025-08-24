@@ -34,7 +34,8 @@ def main():
     print(f"GPU Capability: {gpu_capability}")
     
     # Prepare pipeline config with FP8 quantization
-    model_id = "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"
+    # model_id = "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"
+    model_id = "Wan-AI/Wan2.1-T2V-14B-Diffusers"
     pipeline_config = PipelineConfig.from_pretrained(model_id)
     pipeline_config.dit_precision = "bf16"  # required for FP8
     pipeline_config.dit_config.quant_config = FP8Config()

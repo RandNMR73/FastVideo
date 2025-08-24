@@ -57,15 +57,6 @@ class FP8QuantizeMethod(QuantizeMethodBase):
     @torch.compile
     def apply(self, layer: torch.nn.Module, x: torch.Tensor, bias: torch.Tensor | None = None) -> torch.Tensor:
         """Apply FP8 quantized computation."""
-        # if not hasattr(layer, '_fp8_weight') or layer._fp8_weight is None:
-        #     # start_time = time.time()
-        #     self.weight_fp8, self.weight_scale = per_block_cast_to_fp8(layer.weight)
-        #     torch.cuda.synchronize()
-        #     # end_time = time.time()
-        #     # print(f"Time taken to cast weight to FP8: {end_time - start_time} seconds")
-        #     layer._fp8_weight = self.weight_fp8
-        #     layer._fp8_weight_scale = self.weight_scale
-        
         out_dim = layer.weight.shape[0]
         # Need contiguous tensors for collectives.
         assert x.dtype == torch.bfloat16, f"only allow bf16 inputs to fp8 linear, got {x.dtype}"
