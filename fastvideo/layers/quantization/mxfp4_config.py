@@ -21,7 +21,8 @@ def quantize_mx4(w):
     w, w_scale = downcast_to_mxfp(w.to(torch.bfloat16), torch.uint8, axis=1)
     w = convert_layout(wrap_torch_tensor(w, dtype=FP4), HopperMXValueLayout, mx_axis=1)
     w_scale = convert_layout(wrap_torch_tensor(w_scale), StridedLayout)
-    return w, w_scale
+    # Convert back to PyTorch tensors for buffer registration
+    return w.to_torch(), w_scale.to_torch()
 
 class MXFP4QuantizeMethod(QuantizeMethodBase):
     def __init__(self):
@@ -55,11 +56,15 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         weight_mxfp4 = layer._mxfp4_weight
         weight_scale = layer._mxfp4_weight_scale
         
+        # Convert PyTorch tensors back to Triton tensors for matmul_ogs
+        weight_mxfp4_triton = wrap_torch_tensor(weight_mxfp4, dtype=FP4)
+        weight_scale_triton = wrap_torch_tensor(weight_scale)
+        
         original_shape = x.shape
         x_reshaped = x.view(-1, x.shape[-1])
         
-        pc = PrecisionConfig(weight_scale=weight_scale, flex_ctx=FlexCtx(rhs_data=InFlexData()))
-        out = matmul_ogs(x_reshaped, weight_mxfp4, bias, precision_config=pc)
+        pc = PrecisionConfig(weight_scale=weight_scale_triton, flex_ctx=FlexCtx(rhs_data=InFlexData()))
+        out = matmul_ogs(x_reshaped, weight_mxfp4_triton, bias, precision_config=pc)
             
         if bias is not None:
             if bias.device != out.device or bias.dtype != out.dtype:
