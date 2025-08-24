@@ -103,7 +103,7 @@ class MXFP4Config(QuantizationConfig):
             return MXFP4QuantizeMethod()
         return None
 
-@torch.compile
+# @torch.compile
 def convert_model_to_mxfp4(model: torch.nn.Module):
     from torch.distributed.tensor import DTensor  # type: ignore
     for mod in model.modules():
