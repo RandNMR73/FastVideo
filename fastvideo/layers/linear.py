@@ -251,7 +251,7 @@ class ReplicatedLinear(LinearBase):
         if shape_key not in self._unique_shapes:
             self._unique_shapes.add(shape_key)
             self._shape_to_layer_types[shape_key] = []
-            print(f"Layer: {self.prefix} | input shape: {x.shape} --> output shape: {output.shape}")
+            print(f"Layer: {self.prefix} | input shape: {x.shape} --> output shape: {output.shape}, Quant Method: {self.quant_method.__class__.__name__}")
         
         # Add this layer type to the list for this shape if not already present
         layer_type = self.__class__.__name__
