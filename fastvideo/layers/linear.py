@@ -242,6 +242,7 @@ class ReplicatedLinear(LinearBase):
         if self.quant_method is None:
             # If no quantization method is provided, use unquantized method
             self.quant_method = UnquantizedLinearMethod()
+        
         output = self.quant_method.apply(self, x, bias)
         
         # Create a shape key for uniqueness checking

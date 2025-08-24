@@ -60,6 +60,8 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         layer.register_parameter("weight", weight)
         set_weight_attrs(weight, extra_weight_attrs)
 
+        print(f"weight shape: {weight.shape}")
+
     # @torch.compile
     def apply(self, layer: torch.nn.Module, x: torch.Tensor, bias: torch.Tensor | None = None) -> torch.Tensor:
         """Apply MXFP4 quantized computation."""
@@ -70,7 +72,6 @@ class MXFP4QuantizeMethod(QuantizeMethodBase):
         weight, scale = quantize_mx4(layer.weight)
         
         pc = PrecisionConfig(weight_scale=scale, flex_ctx=FlexCtx(rhs_data=InFlexData()))
-        print(f"weight shape: {weight.shape}, scale shape: {scale.shape}")
         out = matmul_ogs(x, weight, bias, precision_config=pc)
         
         return out
