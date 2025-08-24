@@ -13,7 +13,7 @@ import torch
 from fastvideo import VideoGenerator
 from fastvideo.configs.pipelines.base import PipelineConfig
 from fastvideo.layers.quantization.fp8_config import FP8Config
-from fastvideo.layers.linear import LinearBase
+from fastvideo.layers.linear import ReplicatedLinear
 
 OUTPUT_PATH = "fp8_video_samples"
 OUTPUT_PATH = "video_samples"
@@ -41,7 +41,7 @@ def main():
     pipeline_config.dit_precision = "bf16"  # required for FP8
     pipeline_config.dit_config.quant_config = FP8Config()
 
-    LinearBase.print_shape_summary()
+    ReplicatedLinear.print_shape_summary()
     
     # Create VideoGenerator with FP8-compatible settings
     print("\nLoading model with FP8 quantization...")
