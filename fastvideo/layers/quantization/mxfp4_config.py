@@ -108,24 +108,51 @@ class MXFP4Config(QuantizationConfig):
     def get_quant_method(self, layer: torch.nn.Module, prefix: str):
         # Apply MXFP4 quantization to all linear layers
         from fastvideo.layers.linear import LinearBase
-        mxfp4_layers = ["ffn.fc_in", "ffn.fc_out", "to_q", "to_k", "to_v", "to_out"]
-        if isinstance(layer, LinearBase) and any(layer_name in prefix for layer_name in mxfp4_layers):
-            return MXFP4QuantizeMethod()
+        mxfp4_layers = ["fc_in", "fc_out", "to_q", "to_k", "to_v", "to_out"]
+        
+        # Debug logging to see what prefixes we're getting
+        if isinstance(layer, LinearBase):
+            print(f"Checking layer with prefix: '{prefix}' for MXFP4 quantization")
+            if any(layer_name in prefix for layer_name in mxfp4_layers):
+                print(f"  -> Applying MXFP4 quantization to '{prefix}'")
+                return MXFP4QuantizeMethod()
+            else:
+                print(f"  -> No match found for '{prefix}'")
+                # Fallback: quantize all linear layers if specific matching fails
+                print(f"  -> Fallback: Applying MXFP4 quantization to all linear layers")
+                return MXFP4QuantizeMethod()
+        
         return None
 
 # @torch.compile
 def convert_model_to_mxfp4(model: torch.nn.Module):
     from torch.distributed.tensor import DTensor  # type: ignore
+    print("Starting convert_model_to_mxfp4...")
+    converted_count = 0
+    
     for mod in model.modules():
         qm = getattr(mod, "quant_method", None)
         if isinstance(qm, MXFP4QuantizeMethod):
+            print(f"Converting module with quant_method: {type(qm).__name__}")
             weight = getattr(mod, "weight", None)
             if weight is None:
+                print("  -> No weight found, skipping")
                 continue
             if isinstance(weight, DTensor):  # type: ignore
                 weight_local = weight.to_local()
+                print("  -> Converted DTensor to local")
             else:
                 weight_local = weight
-            mxfp4_w, mxfp4_s = quantize_mx4(weight_local)
-            mod.register_buffer("_mxfp4_weight", mxfp4_w, persistent=False)
-            mod.register_buffer("_mxfp4_weight_scale", mxfp4_s, persistent=False)
+                print(f"  -> Using local weight with shape: {weight_local.shape}")
+            
+            try:
+                mxfp4_w, mxfp4_s = quantize_mx4(weight_local)
+                mod.register_buffer("_mxfp4_weight", mxfp4_w, persistent=False)
+                mod.register_buffer("_mxfp4_weight_scale", mxfp4_s, persistent=False)
+                converted_count += 1
+                print(f"  -> Successfully converted and registered buffers")
+            except Exception as e:
+                print(f"  -> Error during conversion: {e}")
+                continue
+    
+    print(f"convert_model_to_mxfp4 completed. Converted {converted_count} modules.")
