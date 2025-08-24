@@ -16,7 +16,7 @@ from fastvideo.layers.quantization.fp8_config import FP8Config
 from fastvideo.layers.linear import ReplicatedLinear
 
 OUTPUT_PATH = "fp8_video_samples"
-# OUTPUT_PATH = "video_samples"
+OUTPUT_PATH = "video_samples"
 
 def main():
     print("=== FP8 Quantization Video Generation Example ===")
@@ -39,7 +39,7 @@ def main():
     model_id = "Wan-AI/Wan2.1-T2V-14B-Diffusers"
     pipeline_config = PipelineConfig.from_pretrained(model_id)
     pipeline_config.dit_precision = "bf16"  # required for FP8
-    pipeline_config.dit_config.quant_config = FP8Config()
+    # pipeline_config.dit_config.quant_config = FP8Config()
 
     ReplicatedLinear.print_shape_summary()
     
