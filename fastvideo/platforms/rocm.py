@@ -71,7 +71,8 @@ class RocmPlatform(Platform):
             pass
 
         elif selected_backend in (AttentionBackendEnum.SLIDING_TILE_ATTN,
-                                  AttentionBackendEnum.SAGE_ATTN):
+                                  AttentionBackendEnum.SAGE_ATTN,
+                                  AttentionBackendEnum.SAGE_ATTN_THREE):
             raise ValueError(
                 f"{selected_backend.name} is not supported on {cls.device_name}."
             )

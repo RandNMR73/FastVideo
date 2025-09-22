@@ -144,6 +144,20 @@ class CudaPlatformBase(Platform):
                 logger.info(
                     "Sage Attention backend is not installed. Fall back to Flash Attention."
                 )
+        elif selected_backend == AttentionBackendEnum.SAGE_ATTN_THREE:
+            try:
+                from fastvideo.attention.backends.sageattn import sageattn_blackwell  # noqa: F401
+
+                from fastvideo.attention.backends.sage_attn3 import (  # noqa: F401
+                    SageAttention3Backend)
+                logger.info("Using Sage Attention 3 backend.")
+
+                return "fastvideo.attention.backends.sage_attn3.SageAttention3Backend"
+            except ImportError as e:
+                logger.info(e)
+                logger.info(
+                    "Sage Attention 3 backend is not installed. Fall back to Flash Attention."
+                )
         elif selected_backend == AttentionBackendEnum.VIDEO_SPARSE_ATTN:
             try:
                 from vsa import block_sparse_attn  # noqa: F401

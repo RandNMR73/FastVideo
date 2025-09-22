@@ -16,8 +16,8 @@ class DiTArchConfig(ArchConfig):
     lora_param_names_mapping: dict = field(default_factory=dict)
     _supported_attention_backends: tuple[AttentionBackendEnum, ...] = (
         AttentionBackendEnum.SLIDING_TILE_ATTN, AttentionBackendEnum.SAGE_ATTN,
-        AttentionBackendEnum.FLASH_ATTN, AttentionBackendEnum.TORCH_SDPA,
-        AttentionBackendEnum.VIDEO_SPARSE_ATTN)
+        AttentionBackendEnum.SAGE_ATTN_THREE, AttentionBackendEnum.FLASH_ATTN, 
+        AttentionBackendEnum.TORCH_SDPA, AttentionBackendEnum.VIDEO_SPARSE_ATTN)
 
     hidden_size: int = 0
     num_attention_heads: int = 0
