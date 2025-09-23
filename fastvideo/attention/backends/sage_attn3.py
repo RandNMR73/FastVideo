@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch
-from fastvideo.attention.backends.sageattn import sageattn_blackwell
+from fastvideo.attention.backends.sageattn.api import sageattn_blackwell
 
-from fastvideo.attention.backends.abstract import (  # FlashAttentionMetadata,
-    AttentionBackend, AttentionImpl, AttentionMetadata)
+from fastvideo.attention.backends.abstract import (AttentionBackend,
+                                                   AttentionImpl,
+                                                   AttentionMetadata,
+                                                   AttentionMetadataBuilder)
 from fastvideo.logger import init_logger
 
 logger = init_logger(__name__)
@@ -26,6 +28,13 @@ class SageAttention3Backend(AttentionBackend):
     def get_impl_cls() -> type["SageAttention3Impl"]:
         return SageAttention3Impl
 
+    @staticmethod
+    def get_metadata_cls() -> type["AttentionMetadata"]:
+        raise NotImplementedError
+
+    @staticmethod
+    def get_builder_cls() -> type["AttentionMetadataBuilder"]:
+        raise NotImplementedError
     # @staticmethod
     # def get_metadata_cls() -> Type["AttentionMetadata"]:
     #     return FlashAttentionMetadata

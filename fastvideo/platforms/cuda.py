@@ -146,7 +146,7 @@ class CudaPlatformBase(Platform):
                 )
         elif selected_backend == AttentionBackendEnum.SAGE_ATTN_THREE:
             try:
-                from fastvideo.attention.backends.sageattn import sageattn_blackwell  # noqa: F401
+                from fastvideo.attention.backends.sageattn.api import sageattn_blackwell  # noqa: F401
 
                 from fastvideo.attention.backends.sage_attn3 import (  # noqa: F401
                     SageAttention3Backend)
