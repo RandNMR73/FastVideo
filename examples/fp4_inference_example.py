@@ -36,8 +36,8 @@ def main():
     print(f"GPU Capability: {gpu_capability}")
     
     # Prepare pipeline config with FP4 quantization
-    # model_id = "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"
-    model_id = "Wan-AI/Wan2.1-T2V-14B-Diffusers"
+    model_id = "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"
+    # model_id = "Wan-AI/Wan2.1-T2V-14B-Diffusers"
     pipeline_config = PipelineConfig.from_pretrained(model_id)
     pipeline_config.dit_precision = "bf16"  # required for FP4
     pipeline_config.dit_config.quant_config = FP4Config()
@@ -51,7 +51,7 @@ def main():
         pipeline_config=pipeline_config,
         num_gpus=1,
         use_fsdp_inference=True,
-        dit_cpu_offload=False,  # Keep DiT on GPU for FP4
+        dit_cpu_offload=False,  
         vae_cpu_offload=False,
         text_encoder_cpu_offload=True,
         pin_cpu_memory=True,
