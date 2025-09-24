@@ -7,30 +7,9 @@ from torch.nn.parameter import Parameter
 from typing import Any, Tuple
 import deep_gemm
 from deep_gemm import ceil_div, get_mn_major_tma_aligned_tensor
+from deep_gemm.utils import per_token_cast_to_fp8, per_block_cast_to_fp8
 from fastvideo.models.utils import set_weight_attrs
 # import time 
-
-block_size = 128
-
-def per_token_cast_to_fp8(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-    assert x.dim() == 2
-    m, n = x.shape
-    pad_size = (128 - (n % 128)) % 128
-    x = torch.nn.functional.pad(x, (0, pad_size), value=0) if pad_size > 0 else x
-    x_view = x.view(m, -1, 128)
-    x_amax = x_view.abs().float().amax(dim=2).view(m, -1).clamp(1e-4)
-    fp8_data = (x_view * (448.0 / x_amax.unsqueeze(2))).to(torch.float8_e4m3fn)
-    return fp8_data.view(m, n + pad_size)[:, :n], (x_amax / 448.0).view(m, -1)
-
-def per_block_cast_to_fp8(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-    assert x.dim() == 2
-    m, n = x.shape
-    x_padded = torch.zeros((ceil_div(m, 128) * 128, ceil_div(n, 128) * 128), dtype=x.dtype, device=x.device)
-    x_padded[:m, :n] = x
-    x_view = x_padded.view(-1, 128, x_padded.size(1) // 128, 128)
-    x_amax = x_view.abs().float().amax(dim=(1, 3), keepdim=True).clamp(1e-4)
-    x_scaled = (x_view * (448.0 / x_amax)).to(torch.float8_e4m3fn)
-    return x_scaled.view_as(x_padded)[:m, :n].contiguous(), (x_amax / 448.0).view(x_view.size(0), x_view.size(2))
 
 class FP8QuantizeMethod(QuantizeMethodBase):
     def __init__(self):
@@ -60,7 +39,7 @@ class FP8QuantizeMethod(QuantizeMethodBase):
         out_dim = layer.weight.shape[0]
         # Need contiguous tensors for collectives.
         assert x.dtype == torch.bfloat16, f"only allow bf16 inputs to fp8 linear, got {x.dtype}"
-        x_fp8, x_scale = per_token_cast_to_fp8(x.view(-1, x.shape[-1]))
+        x_fp8, x_scale = per_token_cast_to_fp8(x.view(-1, x.shape[-1]), use_ue8m0=False)
         x_scale = get_mn_major_tma_aligned_tensor(x_scale)
         weight_fp8 = layer._fp8_weight
         weight_scale = layer._fp8_weight_scale
@@ -71,7 +50,7 @@ class FP8QuantizeMethod(QuantizeMethodBase):
             (x_fp8, x_scale),
             (weight_fp8, weight_scale),
             out,
-            # disable_ue8m0_cast=False  # TODO: need to set flag based on sm90/sm100
+            disable_ue8m0_cast=False
         )   
             
         if bias is not None:
@@ -129,6 +108,6 @@ def convert_model_to_fp8(model: torch.nn.Module):
                 weight_local = weight.to_local()
             else:
                 weight_local = weight
-            fp8_w, fp8_s = per_block_cast_to_fp8(weight_local)
+            fp8_w, fp8_s = per_block_cast_to_fp8(weight_local, use_ue8m0=False)
             mod.register_buffer("_fp8_weight", fp8_w, persistent=False)
             mod.register_buffer("_fp8_weight_scale", fp8_s, persistent=False)
